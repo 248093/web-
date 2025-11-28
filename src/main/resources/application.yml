@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: live-streaming-service
+
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/live_streaming?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 200301
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+
+
+# MyBatis Plus配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.livestream.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 流媒体服务器配置
+live:
+  srs:
+    server-url: rtmp://192.168.209.128:1935/live  # SRS的RTMP推流/拉流地址，1935是SRS默认RTMP端口，/live是应用名
+    api-url: http://192.168.209.128:1985/api      # SRS的HTTP API地址，1985是SRS API默认端口，用于业务系统控制SRS
+    http-flv-url: http://192.168.209.128:8080/live # SRS的HTTP-FLV拉流地址前缀，8080是SRS内置HTTP服务端口，依赖http_remux模块
+    hls-url: http://192.168.209.128:8080/hls/live  # SRS的HLS拉流地址前缀，依赖hls模块，对应SRS配置的hls_path路径
+  record:
+    save-path: /data/record  # 业务系统存储录制文件的本地路径，需和SRS的dvr模块配合使用
+  push:
+    key-check-enabled: true  # 启用推流鉴权，防止非法推流
+    auth-expire: 86400       # 鉴权密钥有效期24小时（单位：秒）
+    auth-key: huan@live@key # 鉴权密钥，需替换为自定义的复杂字符串，用于生成/校验推流token
+
+# MinIO配置
+minio:
+  endpoint: http://192.168.209.128:9000
+  access-key: root
+  secret-key: 12345678
+  bucket: live-recordings

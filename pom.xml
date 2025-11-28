@@ -12,73 +12,89 @@
     <artifactId>spring-boot-live</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>spring-boot-live</name>
-    <description>spring-boot-live</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
+    <description>SpringBoot 直播系统（集成 SRS 推流、MinIO 录制存储、Redis 缓存）</description>
+    <!-- 移除冗余的空标签（不影响功能，仅优化结构） -->
     <properties>
         <java.version>21</java.version>
     </properties>
     <dependencies>
+        <!-- SpringBoot Web 核心依赖（包含 Tomcat、SpringMVC） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- MySQL 驱动（运行时依赖，不参与编译） -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Lombok（编译时依赖，不打包到产物） -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <optional>true</optional>
+            <version>1.18.42</version>
+            <optional>true</optional> <!-- 关键：标记为编译时依赖，避免打包冗余 -->
         </dependency>
+
+        <!-- SpringBoot 测试依赖（仅测试环境生效） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- WebSocket 支持（直播间实时通信） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- Redis 支持（缓存活跃直播间、观看人数） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- MyBatis Plus 核心依赖（适配 SpringBoot 3.x） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>3.5.5</version>
+        </dependency>
+
+        <!-- MinIO 客户端（录制文件上传存储） -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.4.6</version>
+        </dependency>
+
+        <!-- HTTP 客户端（可选：Hutool 已包含 HTTP 工具，可根据需求保留） -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+
+        <!-- Hutool 工具类库（简化 HTTP、日期、加密等操作） -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.40</version>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
+            <!-- SpringBoot 打包插件（核心：构建可执行 JAR/WAR） -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
+                <!-- 移除冗余的 excludes 配置：Lombok 已通过 optional=true 排除打包 -->
             </plugin>
         </plugins>
     </build>
-
 </project>

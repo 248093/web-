@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易直播播放器</title>
+    <!-- 只保留播放器核心依赖 -->
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-hls@5.15.0/dist/videojs-contrib-hls.min.js"></script>
+    <style>
+        /* 简化样式，专注播放器显示 */
+        body {
+            margin: 20px;
+            padding: 0;
+        }
+        .video-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .video-js {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16/9; /* 保持16:9比例，适配各种屏幕 */
+        }
+        /* 加载提示样式 */
+        .loading-tip {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 18px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 4px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+<div class="video-container">
+    <!-- 播放器容器 -->
+    <div style="position: relative;">
+        <video id="live-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto">
+            <p class="vjs-no-js">
+                请启用JavaScript，并升级到支持HTML5视频的浏览器
+            </p>
+        </video>
+        <!-- 加载提示 -->
+        <div id="loading-tip" class="loading-tip">加载直播中...</div>
+    </div>
+</div>
+
+<script>
+    // 获取URL参数（必须传 roomId）
+    function getQueryParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+    }
+
+    // 简化版初始化：只关注直播画面加载
+    function initPlayer() {
+        const roomId = getQueryParam('roomId');
+        if (!roomId) {
+            alert('请通过 URL 传入直播间ID（例如：?roomId=123）');
+            return;
+        }
+
+        // 1. 先显示加载提示
+        const loadingTip = document.getElementById('loading-tip');
+
+        // 2. 获取直播间信息（只需要直播源URL和状态）
+        fetch(`/api/live/room/${roomId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`接口请求失败，状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(room => {
+                // 检查直播是否正在进行（status=1 假设为直播中）
+                if (room.status !== 1) {
+                    loadingTip.textContent = '直播未开始或已结束';
+                    return;
+                }
+
+                // 检查是否有有效直播源（优先HLS，最兼容）
+                if (!room.hlsUrl) {
+                    loadingTip.textContent = '无有效直播源';
+                    return;
+                }
+
+                // 3. 初始化播放器（只保留核心配置）
+                const player = videojs('live-player', {
+                    autoplay: 'muted', // 静音自动播放（浏览器兼容性最好）
+                    muted: true,       // 初始静音（避免自动播放失败）
+                    controls: true,    // 显示控制栏（播放/暂停/音量等）
+                    preload: 'auto',
+                    responsive: true,  // 响应式适配
+                    fluid: true,       // 流体布局
+                    sources: [{
+                        src: room.hlsUrl,
+                        type: 'application/x-mpegURL' // HLS 格式
+                    }]
+                });
+
+                // 4. 关键事件处理（只保留核心）
+                // 加载成功：隐藏加载提示
+                player.on('loadedmetadata', () => {
+                    loadingTip.style.display = 'none';
+                });
+
+                // 播放失败：显示错误信息
+                player.on('error', () => {
+                    loadingTip.textContent = '直播加载失败，请刷新重试';
+                    console.error('播放器错误:', player.error());
+                });
+
+                // 用户点击播放器：取消静音（提升体验）
+                player.on('useractive', () => {
+                    if (player.muted()) {
+                        player.muted(false);
+                    }
+                });
+            })
+            .catch(error => {
+                // 接口请求失败
+                loadingTip.textContent = '获取直播间信息失败';
+                console.error('错误详情:', error);
+                alert(`获取直播间信息失败：${error.message}`);
+            });
+    }
+
+    // 页面加载完成后立即初始化
+    document.addEventListener('DOMContentLoaded', initPlayer);
+</script>
+</body>
+</html>
