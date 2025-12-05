@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="top.lyh.mapper.SysUserMapper">
+
+    <!-- 通过用户名查询用户 -->
+    <select id="selectByUserName" resultType="top.lyh.entity.pojo.SysUser">
+        SELECT * FROM sys_user WHERE user_name = #{userName} AND enabled = 1
+    </select>
+
+    <!-- 通过手机号查询用户 -->
+    <select id="selectByPhone" resultType="top.lyh.entity.pojo.SysUser">
+        SELECT * FROM sys_user WHERE phone = #{phone} AND enabled = 1
+    </select>
+
+    <!-- 批量查询用户 -->
+    <select id="selectBatchByIds" resultType="top.lyh.entity.pojo.SysUser">
+        SELECT * FROM sys_user WHERE id IN
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

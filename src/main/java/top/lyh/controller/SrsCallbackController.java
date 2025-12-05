@@ -48,6 +48,7 @@ public class SrsCallbackController {
                 callbackDto.getExpire());
                 
         if (!valid) {
+            log.warn("推流密钥验证失败: app={}, stream={}", callbackDto.getApp(), callbackDto.getStream());
             result.put("code", 403);
             result.put("message", "Forbidden");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
@@ -114,7 +115,6 @@ public class SrsCallbackController {
     public ResponseEntity<Map<String, Object>> onDvr(@RequestBody SrsCallbackDto callbackDto) {
         log.info("SRS on_dvr回调: app={}, stream={}, file={}", 
                 callbackDto.getApp(), callbackDto.getStream(), callbackDto.getFile());
-        
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
         result.put("message", "Success");

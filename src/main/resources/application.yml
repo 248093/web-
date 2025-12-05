@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  main:
+    allow-bean-definition-overriding: true
   application:
     name: live-streaming-service
 
@@ -21,11 +23,12 @@ spring:
 
 # MyBatis Plus配置
 mybatis-plus:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.example.livestream.entity
+  mapper-locations: classpath*:top/lyh/mapper/**/*.xml
+  type-aliases-package: top.lyh.entity.pojo
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
 
 # 流媒体服务器配置
 live:
@@ -35,7 +38,7 @@ live:
     http-flv-url: http://192.168.209.128:8080/live # SRS的HTTP-FLV拉流地址前缀，8080是SRS内置HTTP服务端口，依赖http_remux模块
     hls-url: http://192.168.209.128:8080/hls/live  # SRS的HLS拉流地址前缀，依赖hls模块，对应SRS配置的hls_path路径
   record:
-    save-path: /data/record  # 业务系统存储录制文件的本地路径，需和SRS的dvr模块配合使用
+    save-path: /root/dvr/live  # 业务系统存储录制文件的本地路径，需和SRS的dvr模块配合使用
   push:
     key-check-enabled: true  # 启用推流鉴权，防止非法推流
     auth-expire: 86400       # 鉴权密钥有效期24小时（单位：秒）
