@@ -1,6 +1,7 @@
 package top.lyh.common;
 
 import io.jsonwebtoken.Claims;
+import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authc.*;
@@ -77,7 +78,7 @@ public class UserRealm extends AuthorizingRealm {
         if (sysUser == null) {
             throw new UnknownAccountException("用户不存在");
         }
-        if (!sysUser.isEnabled()) {
+        if (sysUser.getEnabled() == 0 || StringUtils.isEmpty(sysUser.getEnabled().toString())) {
             throw new LockedAccountException("账户被锁定");
         }
         Claims claims = jwtUtil.getClaimsByToken(jwt);

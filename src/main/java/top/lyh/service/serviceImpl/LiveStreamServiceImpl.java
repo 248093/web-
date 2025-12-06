@@ -11,10 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.client.RestTemplate;
+import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.entity.pojo.LiveStream;
+import top.lyh.mapper.LiveRecordingMapper;
 import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.mapper.LiveStreamMapper;
+import top.lyh.service.LiveRecordingService;
 import top.lyh.service.LiveStreamService;
 
 import java.time.LocalDateTime;
@@ -34,6 +37,10 @@ public class LiveStreamServiceImpl implements LiveStreamService {
     
     @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private LiveRecordingService liveRecordingService;
+    @Autowired
+    private LiveRecordingMapper liveRecordingMapper;
     
     @Value("${live.srs.server-url}")
     private String srsServerUrl;
@@ -131,16 +138,24 @@ public class LiveStreamServiceImpl implements LiveStreamService {
         liveRoom.setStatus(1);
         liveRoom.setStartTime(LocalDateTime.now());
         liveRoomMapper.updateById(liveRoom);
-        
-        // 创建直播流记录
+        QueryWrapper<LiveStream> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("stream_id", liveRoom.getStreamKey());
+        LiveStream liveStream1 = liveStreamMapper.selectOne(queryWrapper);
         LiveStream liveStream = new LiveStream();
-        liveStream.setRoomId(roomId);
-        liveStream.setStreamId(liveRoom.getStreamKey());
-        liveStream.setProtocol("rtmp");
-        liveStream.setStatus(1);
-        liveStream.setCreatedAt(LocalDateTime.now());
-        liveStream.setUpdatedAt(LocalDateTime.now());
-        liveStreamMapper.insert(liveStream);
+        if (liveStream1 == null){
+            // 创建直播流记录
+            liveStream.setRoomId(roomId);
+            liveStream.setStreamId(liveRoom.getStreamKey());
+            liveStream.setProtocol("rtmp");
+            liveStream.setStatus(1);
+            liveStream.setCreatedAt(LocalDateTime.now());
+            liveStream.setUpdatedAt(LocalDateTime.now());
+            liveStreamMapper.insert(liveStream);
+        }else {
+            liveStream.setStatus(1);
+            liveStream.setUpdatedAt(LocalDateTime.now());
+            liveStreamMapper.updateById(liveStream);
+        }
         
         // 更新Redis缓存中的活跃直播间
         redisTemplate.opsForSet().add("live:active_rooms", String.valueOf(roomId));
@@ -263,7 +278,8 @@ public class LiveStreamServiceImpl implements LiveStreamService {
             if (liveRoom != null && liveRoom.getStatus() != 1) {
                 // 更新直播间状态
                 startLiveStream(liveRoom.getId());
-                
+                // 新增：自动开始录制
+                LiveRecording recording = liveRecordingService.startRecording(liveRoom.getId());
                 log.info("直播流发布成功: app={}, stream={}, roomId={}", app, stream, liveRoom.getId());
             }
         } catch (Exception e) {
@@ -284,6 +300,18 @@ public class LiveStreamServiceImpl implements LiveStreamService {
             if (liveRoom != null && liveRoom.getStatus() == 1) {
                 // 更新直播间状态
                 endLiveStream(liveRoom.getId());
+                QueryWrapper<LiveRecording> recordingQuery = new QueryWrapper<>();
+                recordingQuery.eq("room_id", liveRoom.getId())
+                        .eq("status", 0); // 假设 0 表示“录制中”
+                LiveRecording recording = liveRecordingMapper.selectOne(recordingQuery);
+
+                if (recording != null) {
+                    liveRecordingService.stopRecording(recording.getId());
+                    log.info("推流结束，自动停止录制: roomId={}, recordingId={}",
+                            liveRoom.getId(), recording.getId());
+                }
+
+                log.info("直播流关闭: app={}, stream={}, roomId={}", app, stream, liveRoom.getId());
                 
                 log.info("直播流关闭: app={}, stream={}, roomId={}", app, stream, liveRoom.getId());
             }

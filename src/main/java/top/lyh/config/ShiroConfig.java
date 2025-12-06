@@ -1,6 +1,7 @@
 package top.lyh.config;
 
 import jakarta.servlet.Filter;
+import org.apache.shiro.authc.credential.HashedCredentialsMatcher;
 import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
 import org.apache.shiro.mgt.DefaultSubjectDAO;
 import org.apache.shiro.spring.LifecycleBeanPostProcessor;
@@ -27,7 +28,6 @@ import java.util.LinkedHashMap;
  */
 @Configuration
 public class ShiroConfig {
-
     @Bean("securityManager")
     public DefaultWebSecurityManager securityManager(@Qualifier("userRealm") UserRealm userRealm) {
         DefaultWebSecurityManager securityManager = new DefaultWebSecurityManager();
@@ -62,6 +62,7 @@ public class ShiroConfig {
         // 拦截器
         LinkedHashMap<String, String> map = new LinkedHashMap<>();
         map.put("/api/user/login", "anon");
+        map.put("/api/user/register", "anon");
         map.put("/api/srs/callback/**","anon");
         map.put("/**", "jwt");
         shiroFilter.setFilterChainDefinitionMap(map);

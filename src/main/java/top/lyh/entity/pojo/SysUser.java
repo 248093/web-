@@ -59,18 +59,14 @@ public class SysUser {
      * 创建时间（注册时间）
      */
     private Date createTime;
+    /**
+     * 盐值
+     */
+    private String salt;
 
     /**
      * 更新时间
      */
     private Date updateTime;
-    // Shiro 盐值：用 userName 作为盐（与你的 Realm 中 salt 逻辑一致）
-    public String getCredentialsSalt() {
-        return userName;
-    }
 
-    // 适配 isEnabled() 方法（你的 Realm 中判断账户是否锁定）
-    public boolean isEnabled() {
-        return enabled == 1;
-    }
 }

@@ -50,3 +50,11 @@ minio:
   access-key: root
   secret-key: 12345678
   bucket: live-recordings
+
+lyh:
+  sendMessage:
+    serverPort: ${sms.server.port}
+    accountSId: ${sms.account.sid}
+    accountToken: ${sms.account.token}
+    appId: ${sms.app.id}
+    templateId: ${sms.template.id}

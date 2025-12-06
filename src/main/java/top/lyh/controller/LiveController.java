@@ -1,6 +1,8 @@
 package top.lyh.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ public class LiveController {
     /**
      * 创建直播间
      */
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room")
     public ResponseEntity<LiveRoom> createLiveRoom(@RequestBody LiveRoom liveRoom) {
         try {
@@ -61,6 +64,7 @@ public class LiveController {
     /**
      * 开始直播
      */
+    @RequiresRoles({"ADMIN,HOST"})
     @PostMapping("/room/{roomId}/start")
     public ResponseEntity<LiveRoom> startLiveStream(@PathVariable Long roomId) {
         log.info("直播间Id"+roomId);
@@ -77,7 +81,9 @@ public class LiveController {
     
     /**
      * 结束直播
+     *
      */
+    @RequiresRoles({"ADMIN,HOST"})
     @PostMapping("/room/{roomId}/end")
     public ResponseEntity<LiveRoom> endLiveStream(@PathVariable Long roomId) {
         try {

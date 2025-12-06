@@ -1,6 +1,8 @@
 package top.lyh.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import top.lyh.common.ResultDTO;
+import top.lyh.entity.dto.UserRegisterDTO;
 import top.lyh.entity.pojo.SysUser;
 import java.util.Set;
 
@@ -29,5 +31,6 @@ public interface SysUserService extends IService<SysUser> {
      * @return 权限编码集合（如 {"live:view", "live:create"}）
      */
     Set<String> findPermissions(String userName);
+    ResultDTO addUser(UserRegisterDTO userRegisterDTO);
 
 }

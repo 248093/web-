@@ -17,12 +17,14 @@ import top.lyh.mapper.LiveRecordingMapper;
 import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.service.LiveRecordingService;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
@@ -42,6 +44,10 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
     
     @Value("${live.record.save-path}")
     private String recordSavePath;
+
+    // 【新增】录制进程缓存：key=recordingId，value=FFmpeg进程（线程安全，仅新增这1个全局变量）
+    private final Map<String, Process> recordingProcessCache = new ConcurrentHashMap<>();
+    private final Map<String, Long> recordingProcessPidCache = new ConcurrentHashMap<>();
     
     /**
      * 开始录制直播
@@ -84,12 +90,9 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
         recording.setStatus(1);  // 录制完成
         recording.setEndTime(LocalDateTime.now());
         recording.setUpdatedAt(LocalDateTime.now());
-        
+        log.info("录制实体"+recording.toString());
         recordingMapper.updateById(recording);
-        
-        // 异步停止录制进程并上传文件
         stopRecordingProcess(recording);
-        
         return recording;
     }
     
@@ -105,10 +108,7 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
         
         return recordingMapper.selectPage(pageParam, queryWrapper).getRecords();
     }
-    
-    /**
-     * 启动录制进程
-     */
+
     /**
      * 启动直播录制进程
      *
@@ -116,78 +116,119 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
      * @param recording 录制记录信息
      */
     private void startRecordingProcess(LiveRoom liveRoom, LiveRecording recording) {
-        // 使用线程池异步执行录制任务，避免阻塞主线程
         CompletableFuture.runAsync(() -> {
+            Process process = null;
             try {
-                // 创建录制文件保存目录
                 File saveDir = new File(recordSavePath);
                 if (!saveDir.exists()) {
                     saveDir.mkdirs();
                 }
 
-                // 构建录制文件输出路径和输入流地址
                 String outputPath = recordSavePath + "/" + recording.getFileName();
                 String inputUrl = liveRoom.getFlvUrl();
 
-                // 使用FFmpeg命令行工具进行录制
-                // 参数说明:
-                // -i {inputUrl}: 输入流地址
-                // -c:v copy: 视频流直接复制，不重新编码
-                // -c:a aac: 音频流编码为AAC格式
-                // -strict -2: 允许使用实验性编码器
-                // {outputPath}: 输出文件路径
                 ProcessBuilder pb = new ProcessBuilder(
                         "ffmpeg",
                         "-i", inputUrl,
                         "-c:v", "copy",
                         "-c:a", "aac",
                         "-strict", "-2",
+                        "-y",
+                        "-timeout", "5000000",
                         outputPath
                 );
 
-                // 启动FFmpeg进程
-                Process process = pb.start();
-
-                // 添加JVM关闭钩子，在应用退出时销毁录制进程
+                process = pb.start();
                 String processKey = "live:recording:process:" + recording.getId();
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    process.destroy();
-                }));
+                recordingProcessCache.put(processKey, process);
 
-                log.info("开始录制直播, roomId={}, recordingId={}", liveRoom.getId(), recording.getId());
+                // 仅保留PID缓存逻辑（Java 9+）
+                if (System.getProperty("java.version").startsWith("9")) {
+                    try {
+                        long pid = process.pid();
+                        recordingProcessPidCache.put(processKey, pid);
+                        log.info("FFmpeg启动成功, recordingId={}, PID={}", recording.getId(), pid);
+                    } catch (Exception e) {
+                        log.warn("获取FFmpeg PID失败（Java版本可能低于9）", e);
+                    }
+                }
 
-                // 等待录制进程执行完成
-                int exitCode = process.waitFor();
+                boolean isExited = process.waitFor(1, TimeUnit.HOURS);
+                int exitCode = process.exitValue();
+                log.info("FFmpeg进程退出, recordingId={}, exitCode={}, isExited={}",
+                        recording.getId(), exitCode, isExited);
 
-                log.info("录制进程结束, roomId={}, recordingId={}, exitCode={}",
-                        liveRoom.getId(), recording.getId(), exitCode);
-
-                // 如果录制正常结束(exitCode==0)，则上传录制文件
-                if (exitCode == 0) {
-                    uploadRecording(recording, new File(outputPath));
+                File recordFile = new File(outputPath);
+                if (recordFile.exists() && recordFile.length() > 0) {
+                    uploadRecording(recording, recordFile);
+                } else {
+                    log.error("录制文件为空, recordingId={}", recording.getId());
+                    updateRecordingStatus(recording.getId(), 4);
                 }
 
             } catch (Exception e) {
-                log.error("录制直播异常", e);
-
-                // 录制出现异常时，更新录制状态为失败
-                LiveRecording failedRecording = new LiveRecording();
-                failedRecording.setId(recording.getId());
-                failedRecording.setStatus(4);  // 失败状态
-                failedRecording.setUpdatedAt(LocalDateTime.now());
-
-                recordingMapper.updateById(failedRecording);
+                log.error("录制异常", e);
+                updateRecordingStatus(recording.getId(), 4);
+            } finally {
+                if (process != null) {
+                    String processKey = "live:recording:process:" + recording.getId();
+                    recordingProcessCache.remove(processKey);
+                    recordingProcessPidCache.remove(processKey);
+                    if (process.isAlive()) {
+                        process.destroyForcibly();
+                    }
+                }
             }
         });
     }
 
     /**
-     * 停止录制进程
+     * 停止录制进程（仅保留PID停止方案）
      */
     private void stopRecordingProcess(LiveRecording recording) {
-        // 这里可以实现停止特定的FFmpeg进程
-        // 在实际实现中，需要保存进程ID并通过操作系统命令停止进程
-        log.info("手动停止录制, recordingId={}", recording.getId());
+        log.info("Windows下手动停止录制, recordingId={}", recording.getId());
+
+        try {
+            String processKey = "live:recording:process:" + recording.getId();
+            Long ffmpegPid = recordingProcessPidCache.get(processKey);
+
+            // 仅保留PID停止逻辑
+            if (ffmpegPid != null) {
+                ProcessBuilder pb = new ProcessBuilder("taskkill", "/F", "/T", "/PID", String.valueOf(ffmpegPid));
+                pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+                pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                Process killProcess = pb.start();
+                boolean isKilled = killProcess.waitFor(5, TimeUnit.SECONDS);
+
+                if (isKilled && killProcess.exitValue() == 0) {
+                    log.info("通过PID停止FFmpeg成功, recordingId={}, PID={}", recording.getId(), ffmpegPid);
+                    Thread.sleep(800);
+                    uploadRecording(recording, new File(recordSavePath + "/" + recording.getFileName()));
+                    return;
+                }
+            }
+
+            // PID停止失败时直接标记为失败（无兜底逻辑）
+            log.error("PID停止失败, recordingId={}", recording.getId());
+            updateRecordingStatus(recording.getId(), 4);
+
+        } catch (Exception e) {
+            log.error("停止录制进程异常, recordingId={}", recording.getId(), e);
+            updateRecordingStatus(recording.getId(), 4);
+        } finally {
+            String processKey = "live:recording:process:" + recording.getId();
+            recordingProcessCache.remove(processKey);
+            recordingProcessPidCache.remove(processKey);
+        }
+    }
+
+    // 提取统一的状态更新方法（与启动方法复用）
+    private void updateRecordingStatus(Long recordingId, int status) {
+        LiveRecording update = new LiveRecording();
+        update.setId(recordingId);
+        update.setStatus(status);
+        update.setUpdatedAt(LocalDateTime.now());
+        recordingMapper.updateById(update);
     }
     
     /**
@@ -201,24 +242,24 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
             processingRecording.setStatus(2);  // 处理中
             processingRecording.setUpdatedAt(LocalDateTime.now());
             recordingMapper.updateById(processingRecording);
-            
+
             // 获取文件元数据
             long fileSize = file.length();
-            
+
             // 使用FFmpeg获取视频时长
             String[] cmd = {
-                "ffprobe", 
-                "-v", "error", 
-                "-show_entries", "format=duration", 
-                "-of", "default=noprint_wrappers=1:nokey=1", 
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
                 file.getAbsolutePath()
             };
-            
+
             Process process = Runtime.getRuntime().exec(cmd);
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String durationStr = reader.readLine();
             int duration = (int) Float.parseFloat(durationStr);
-            
+
             // 上传到MinIO
             String objectName = "recordings/" + recording.getFileName();
             minioClient.uploadObject(
@@ -229,7 +270,7 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
                     .contentType("video/mp4")
                     .build()
             );
-            
+
             // 构建访问URL
             String fileUrl = minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
@@ -238,7 +279,7 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
                     .method(Method.GET)
                     .build()
             );
-            
+
             // 更新录制记录
             LiveRecording updatedRecording = new LiveRecording();
             updatedRecording.setId(recording.getId());
@@ -247,24 +288,24 @@ public class LiveRecordingServiceImpl implements LiveRecordingService {
             updatedRecording.setDuration(duration);
             updatedRecording.setStatus(3);  // 可用状态
             updatedRecording.setUpdatedAt(LocalDateTime.now());
-            
+
             recordingMapper.updateById(updatedRecording);
-            
-            log.info("录制文件上传完成, recordingId={}, fileSize={}, duration={}s", 
+
+            log.info("录制文件上传完成, recordingId={}, fileSize={}, duration={}s",
                     recording.getId(), fileSize, duration);
-            
+
             // 删除本地文件
             file.delete();
-            
+
         } catch (Exception e) {
             log.error("上传录制文件异常", e);
-            
+
             // 更新录制状态为失败
             LiveRecording failedRecording = new LiveRecording();
             failedRecording.setId(recording.getId());
             failedRecording.setStatus(4);  // 失败状态
             failedRecording.setUpdatedAt(LocalDateTime.now());
-            
+
             recordingMapper.updateById(failedRecording);
         }
     }
