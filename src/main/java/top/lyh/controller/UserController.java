@@ -61,7 +61,7 @@ public class UserController {
         // 5. 返回登录成功信息
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
-        result.put("username", user.getUserName());
+        result.put("userName", user.getUserName());
         result.put("userId", user.getId());
         response.setHeader(JwtUtil.HEADER, token);
         return ResultDTO.success("登录成功", result);
@@ -78,8 +78,9 @@ public class UserController {
         return sysUserService.addUser(userRegisterDTO);
     }
     @PutMapping("/sendMessage")
-    public ResultDTO sendMessage(@PhoneNumber @RequestParam String phone)
+    public ResultDTO sendMessage(@Validated @PhoneNumber @RequestParam String phone)
     {
+        System.out.println(phone);
         return sendMessageService.sendMessage(phone);
     }
 

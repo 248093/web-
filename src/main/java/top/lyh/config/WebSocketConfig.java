@@ -21,7 +21,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 注册STOMP端点
-        registry.addEndpoint("/ws")
+        registry.addEndpoint("/ws-live")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
     }

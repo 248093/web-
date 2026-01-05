@@ -49,8 +49,9 @@ public class JwtFilter extends AccessControlFilter {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         String token = request.getHeader(JwtUtil.HEADER);
         //如果token为空的话，返回true，交给控制层@RequiresAuthentication进行判断；也会达到没有权限的作用
-        if (token == null) {
-            return true;
+        if (token == null || token.trim().isEmpty()) {
+            onLoginFail(servletResponse); // 处理认证失败
+            return false;
         }
         JwtToken jwtToken = new JwtToken(token);
         try {

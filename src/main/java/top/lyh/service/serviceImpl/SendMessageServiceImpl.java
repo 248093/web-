@@ -41,7 +41,7 @@ public class SendMessageServiceImpl implements SendMessageService {
         String templateId = sendMessageConfig.getTemplateId();
         String[] datas = {String.valueOf(code),"1"};
         HashMap<String, Object> result = sdk.sendTemplateSMS(to, templateId, datas);
-        redisUtil.set("phone:"+phone,code,100);
+        redisUtil.set("phone:"+phone,code,60);
         if ("000000".equals(result.get("statusCode"))) {
             //正常返回输出data包体信息（map）
             HashMap<String, Object> data = (HashMap<String, Object>) result.get("data");

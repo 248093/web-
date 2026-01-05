@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="top.lyh.mapper.LiveRoomMapper">
+
+    <!-- LiveRoomDetailDto的映射结果集 -->
+    <resultMap id="LiveRoomDetailVoMap" type="top.lyh.entity.vo.LiveRoomDetailVo">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="coverUrl" column="cover_url"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="hlsUrl" column="hls_url"/>
+        <result property="status" column="status"/>
+        <result property="viewCount" column="view_count"/>
+        <result property="likeCount" column="like_count"/>
+        <result property="startTime" column="start_time"/>
+    </resultMap>
+
+    <!-- 动态条件查询直播间列表（唯一的核心查询方法） -->
+    <select id="selectByCondition" resultMap="LiveRoomDetailVoMap">
+        SELECT
+        lr.id,
+        lr.title,
+        lr.cover_url,
+        lr.user_id,
+        su.user_name,
+        lr.hls_url,
+        lr.status,
+        lr.view_count,
+        lr.like_count,
+        lr.start_time
+        FROM live_room lr
+        LEFT JOIN sys_user su ON lr.user_id = su.id
+        <where>
+            <!-- 用户状态筛选 -->
+            <if test="query.enabledOnly == null or query.enabledOnly == true">
+                AND su.enabled = 1
+            </if>
+
+            <!-- 直播间ID -->
+            <if test="query.id != null">
+                AND lr.id = #{query.id}
+            </if>
+
+            <!-- 直播间标题模糊查询 -->
+            <if test="query.title != null and query.title != ''">
+                AND lr.title LIKE CONCAT('%', #{query.title}, '%')
+            </if>
+
+            <!-- 主播用户ID -->
+            <if test="query.userId != null">
+                AND lr.user_id = #{query.userId}
+            </if>
+
+            <!-- 主播用户名模糊查询 -->
+            <if test="query.userName != null and query.userName != ''">
+                AND su.user_name LIKE CONCAT('%', #{query.userName}, '%')
+            </if>
+
+            <!-- 直播状态 -->
+            <if test="query.status != null">
+                AND lr.status = #{query.status}
+            </if>
+        </where>
+
+        <!-- 排序 -->
+        <if test="query.orderBy != null and query.orderBy != ''">
+            ORDER BY
+            <choose>
+                <!-- 综合评分排序：view_count * 5 + like_count * 1.5 -->
+                <when test="query.orderBy == 'score'">
+                    (lr.view_count * 5 + lr.like_count * 1.5)
+                </when>
+                <when test="query.orderBy == 'view_count'">lr.view_count</when>
+                <when test="query.orderBy == 'like_count'">lr.like_count</when>
+            </choose>
+            <choose>
+                <when test="query.orderType != null and query.orderType.toUpperCase() == 'ASC'">ASC</when>
+                <otherwise>DESC</otherwise>
+            </choose>
+        </if>
+        <if test="query.orderBy == null or query.orderBy == ''">
+            <!-- 默认按综合评分排序 -->
+            ORDER BY (lr.view_count * 5 + lr.like_count * 1.5) DESC
+        </if>
+
+        <!-- 分页 -->
+        <if test="limit != null">
+            LIMIT #{limit}
+            <if test="offset != null">
+                OFFSET #{offset}
+            </if>
+        </if>
+    </select>
+
+</mapper>

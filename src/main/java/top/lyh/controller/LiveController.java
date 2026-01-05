@@ -7,10 +7,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import top.lyh.common.ResponseCodeEnum;
+import top.lyh.common.ResultDTO;
+import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
+import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.service.LiveRecordingService;
+import top.lyh.service.LiveRoomService;
 import top.lyh.service.LiveStreamService;
 
 import java.util.List;
@@ -19,16 +24,16 @@ import java.util.List;
 @RequestMapping("/api/live")
 @Slf4j
 public class LiveController {
-    
+
     @Autowired
     private LiveStreamService liveStreamService;
-    
+
     @Autowired
     private LiveRecordingService recordingService;
- 
+
     @Autowired
-    private LiveRoomMapper liveRoomMapper;
-    
+    private LiveRoomService liveRoomService;
+
     /**
      * 创建直播间
      */
@@ -36,21 +41,21 @@ public class LiveController {
     @PostMapping("/room")
     public ResponseEntity<LiveRoom> createLiveRoom(@RequestBody LiveRoom liveRoom) {
         try {
-            LiveRoom createdRoom = liveStreamService.createLiveRoom(liveRoom);
+            LiveRoom createdRoom = liveRoomService.createLiveRoom(liveRoom);
             return ResponseEntity.ok(createdRoom);
         } catch (Exception e) {
             log.error("创建直播间异常", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 获取直播间详情
      */
     @GetMapping("/room/{roomId}")
     public ResponseEntity<LiveRoom> getLiveRoom(@PathVariable Long roomId) {
         try {
-            LiveRoom liveRoom = liveRoomMapper.selectById(roomId);
+            LiveRoom liveRoom = liveRoomService.getById(roomId);
             if (liveRoom == null) {
                 return ResponseEntity.notFound().build();
             }
@@ -60,14 +65,14 @@ public class LiveController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 开始直播
      */
     @RequiresRoles({"ADMIN,HOST"})
     @PostMapping("/room/{roomId}/start")
     public ResponseEntity<LiveRoom> startLiveStream(@PathVariable Long roomId) {
-        log.info("直播间Id"+roomId);
+        log.info("直播间Id" + roomId);
         try {
             LiveRoom liveRoom = liveStreamService.startLiveStream(roomId);
             return ResponseEntity.ok(liveRoom);
@@ -78,10 +83,9 @@ public class LiveController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 结束直播
-     *
      */
     @RequiresRoles({"ADMIN,HOST"})
     @PostMapping("/room/{roomId}/end")
@@ -96,23 +100,27 @@ public class LiveController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
+
     /**
-     * 获取活跃直播间列表
+     * GET分页方式查询（参数通过URL拼接，不是标准JSON）
      */
-    @GetMapping("/rooms/active")
-    public ResponseEntity<List<LiveRoom>> getActiveLiveRooms(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    @PostMapping("/rooms")
+    public ResultDTO getLiveRooms(
+            @RequestBody LiveRoomQueryDto query) {  // 现在只有一个参数
         try {
-            List<LiveRoom> rooms = liveStreamService.getActiveLiveRooms(page, size);
-            return ResponseEntity.ok(rooms);
+            // 设置默认值
+            if (query.getPage() == null) query.setPage(1);
+            if (query.getSize() == null) query.setSize(10);
+
+            List<LiveRoomDetailVo> rooms = liveRoomService.getActiveLiveRooms(query);
+            return ResultDTO.success(rooms);
         } catch (Exception e) {
-            log.error("获取活跃直播间列表异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("获取直播间列表异常", e);
+            return ResultDTO.error(ResponseCodeEnum.ERROR,"获取直播间列表异常");
         }
     }
-    
+
     /**
      * 获取热门直播间
      */
@@ -120,28 +128,28 @@ public class LiveController {
     public ResponseEntity<List<LiveRoom>> getHotLiveRooms(
             @RequestParam(defaultValue = "10") int limit) {
         try {
-            List<LiveRoom> rooms = liveStreamService.getHotLiveRooms(limit);
+            List<LiveRoom> rooms = liveRoomService.getHotLiveRooms(limit);
             return ResponseEntity.ok(rooms);
         } catch (Exception e) {
             log.error("获取热门直播间异常", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 增加观看人数
      */
     @PostMapping("/room/{roomId}/view")
     public ResponseEntity<Void> incrementViewCount(@PathVariable Long roomId) {
         try {
-            liveStreamService.incrementViewCount(roomId);
+            liveRoomService.incrementViewCount(roomId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("增加观看人数异常", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 开始录制直播
      */
@@ -157,7 +165,7 @@ public class LiveController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 停止录制直播
      */
@@ -173,7 +181,7 @@ public class LiveController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 获取直播回放列表
      */

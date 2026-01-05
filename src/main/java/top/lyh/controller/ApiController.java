@@ -27,10 +27,4 @@ public class ApiController {
     public ResponseEntity<?> admin() {
         return ResponseEntity.ok("欢迎管理员");
     }
- 
-    @GetMapping("/user")
-    @RequiresPermissions("sys:user:view")
-    public ResponseEntity<?> user() {
-        return ResponseEntity.ok("用户信息");
-    }
 }
