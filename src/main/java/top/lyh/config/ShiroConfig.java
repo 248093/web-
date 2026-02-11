@@ -1,6 +1,9 @@
 package top.lyh.config;
 
 import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.credential.HashedCredentialsMatcher;
 import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
 import org.apache.shiro.mgt.DefaultSubjectDAO;
@@ -13,6 +16,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import top.lyh.common.UserRealm;
 import top.lyh.filter.JwtFilter;
 
@@ -27,6 +32,7 @@ import java.util.LinkedHashMap;
  * 3、ShiroFilterFactoryBean
  */
 @Configuration
+@Slf4j
 public class ShiroConfig {
     @Bean("securityManager")
     public DefaultWebSecurityManager securityManager(@Qualifier("userRealm") UserRealm userRealm) {
@@ -39,12 +45,14 @@ public class ShiroConfig {
         defaultSessionStorageEvaluator.setSessionStorageEnabled(false);
         subjectDAO.setSessionStorageEvaluator(defaultSessionStorageEvaluator);
         securityManager.setSubjectDAO(subjectDAO);
+        SecurityUtils.setSecurityManager(securityManager);
         // securityManager.setSubjectFactory(subjectFactory());
         return securityManager;
     }
 
     @Bean("shiroFilterFactoryBean")
-    public ShiroFilterFactoryBean shiroFilterFactoryBean(@Qualifier("securityManager") DefaultWebSecurityManager securityManager) {
+    public ShiroFilterFactoryBean shiroFilterFactoryBean(@Qualifier("securityManager") DefaultWebSecurityManager securityManager,
+                                                         JwtFilter jwtFilter) {
         ShiroFilterFactoryBean shiroFilter = new ShiroFilterFactoryBean();
         shiroFilter.setSecurityManager(securityManager);
 
@@ -56,18 +64,15 @@ public class ShiroConfig {
          *  注册jwt过滤器，除/login外都先经过jwtFilter
          */
         HashMap<String, Filter> filterMap = new HashMap<>();
-        filterMap.put("jwt", new JwtFilter());
+        filterMap.put("jwt", jwtFilter);
         shiroFilter.setFilters(filterMap);
-
         // 拦截器
         LinkedHashMap<String, String> map = new LinkedHashMap<>();
 //        map.put("/**","anon");
-        map.put("/api/user/login", "anon");
-        map.put("/api/user/register", "anon");
-        map.put("/api/srs/callback/**","anon");
-        map.put("/api/user/sendMessage", "anon");
-        map.put("/ws-live/**", "anon");
         map.put("/**", "jwt");
+
+        // 打印过滤器链（验证顺序）
+        log.info("Shiro 过滤器链：{}", map);
         shiroFilter.setFilterChainDefinitionMap(map);
         return shiroFilter;
     }

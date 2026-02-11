@@ -60,4 +60,8 @@ public class LiveRoomDetailVo {
      * 开播时间
      */
     private LocalDateTime startTime;
+    /**
+     * 直播分类
+     */
+    private String category;
 }

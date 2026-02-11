@@ -41,4 +41,6 @@ public class LiveRoom {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+
+    private String category;
 }

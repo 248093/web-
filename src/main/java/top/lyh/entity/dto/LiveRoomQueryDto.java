@@ -58,4 +58,8 @@ public class LiveRoomQueryDto {
      * 每页大小
      */
     private Integer size = 10;
+    /**
+     * 分类
+     * */
+    private String category;
 }

@@ -4,8 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.common.ResultDTO;
@@ -13,7 +11,6 @@ import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.entity.vo.LiveRoomDetailVo;
-import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.service.LiveRecordingService;
 import top.lyh.service.LiveRoomService;
 import top.lyh.service.LiveStreamService;
@@ -39,13 +36,13 @@ public class LiveController {
      */
     @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room")
-    public ResponseEntity<LiveRoom> createLiveRoom(@RequestBody LiveRoom liveRoom) {
+    public ResultDTO createLiveRoom(@RequestBody LiveRoom liveRoom) {
         try {
             LiveRoom createdRoom = liveRoomService.createLiveRoom(liveRoom);
-            return ResponseEntity.ok(createdRoom);
+            return ResultDTO.success("创建直播间成功", createdRoom);
         } catch (Exception e) {
             log.error("创建直播间异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "创建直播间异常");
         }
     }
 
@@ -53,71 +50,68 @@ public class LiveController {
      * 获取直播间详情
      */
     @GetMapping("/room/{roomId}")
-    public ResponseEntity<LiveRoom> getLiveRoom(@PathVariable Long roomId) {
+    public ResultDTO getLiveRoom(@PathVariable Long roomId) {
         try {
             LiveRoom liveRoom = liveRoomService.getById(roomId);
             if (liveRoom == null) {
-                return ResponseEntity.notFound().build();
+                return ResultDTO.error(ResponseCodeEnum.NOT_FOUND, "直播间不存在");
             }
-            return ResponseEntity.ok(liveRoom);
+            return ResultDTO.success("获取直播间详情成功", liveRoom);
         } catch (Exception e) {
             log.error("获取直播间详情异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播间详情异常");
         }
     }
 
     /**
      * 开始直播
      */
-    @RequiresRoles({"ADMIN,HOST"})
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room/{roomId}/start")
-    public ResponseEntity<LiveRoom> startLiveStream(@PathVariable Long roomId) {
-        log.info("直播间Id" + roomId);
+    public ResultDTO startLiveStream(@PathVariable Long roomId) {
+        log.info("直播间Id: {}", roomId);
         try {
             LiveRoom liveRoom = liveStreamService.startLiveStream(roomId);
-            return ResponseEntity.ok(liveRoom);
+            return ResultDTO.success("开始直播成功", liveRoom);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResultDTO.error(ResponseCodeEnum.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             log.error("开始直播异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "开始直播异常");
         }
     }
 
     /**
      * 结束直播
      */
-    @RequiresRoles({"ADMIN,HOST"})
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room/{roomId}/end")
-    public ResponseEntity<LiveRoom> endLiveStream(@PathVariable Long roomId) {
+    public ResultDTO endLiveStream(@PathVariable Long roomId) {
         try {
             LiveRoom liveRoom = liveStreamService.endLiveStream(roomId);
-            return ResponseEntity.ok(liveRoom);
+            return ResultDTO.success("结束直播成功", liveRoom);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResultDTO.error(ResponseCodeEnum.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             log.error("结束直播异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "结束直播异常");
         }
     }
-
 
     /**
      * GET分页方式查询（参数通过URL拼接，不是标准JSON）
      */
     @PostMapping("/rooms")
-    public ResultDTO getLiveRooms(
-            @RequestBody LiveRoomQueryDto query) {  // 现在只有一个参数
+    public ResultDTO getLiveRooms(@RequestBody LiveRoomQueryDto query) {
         try {
-            // 设置默认值
             if (query.getPage() == null) query.setPage(1);
             if (query.getSize() == null) query.setSize(10);
 
             List<LiveRoomDetailVo> rooms = liveRoomService.getActiveLiveRooms(query);
-            return ResultDTO.success(rooms);
+            return ResultDTO.success("获取直播间列表成功", rooms);
         } catch (Exception e) {
             log.error("获取直播间列表异常", e);
-            return ResultDTO.error(ResponseCodeEnum.ERROR,"获取直播间列表异常");
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播间列表异常");
         }
     }
 
@@ -125,14 +119,13 @@ public class LiveController {
      * 获取热门直播间
      */
     @GetMapping("/rooms/hot")
-    public ResponseEntity<List<LiveRoom>> getHotLiveRooms(
-            @RequestParam(defaultValue = "10") int limit) {
+    public ResultDTO getHotLiveRooms(@RequestParam(defaultValue = "10") int limit) {
         try {
             List<LiveRoom> rooms = liveRoomService.getHotLiveRooms(limit);
-            return ResponseEntity.ok(rooms);
+            return ResultDTO.success("获取热门直播间成功", rooms);
         } catch (Exception e) {
             log.error("获取热门直播间异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取热门直播间异常");
         }
     }
 
@@ -140,13 +133,13 @@ public class LiveController {
      * 增加观看人数
      */
     @PostMapping("/room/{roomId}/view")
-    public ResponseEntity<Void> incrementViewCount(@PathVariable Long roomId) {
+    public ResultDTO incrementViewCount(@PathVariable Long roomId) {
         try {
             liveRoomService.incrementViewCount(roomId);
-            return ResponseEntity.ok().build();
+            return ResultDTO.success("增加观看人数成功");
         } catch (Exception e) {
             log.error("增加观看人数异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "增加观看人数异常");
         }
     }
 
@@ -154,15 +147,15 @@ public class LiveController {
      * 开始录制直播
      */
     @PostMapping("/room/{roomId}/record/start")
-    public ResponseEntity<LiveRecording> startRecording(@PathVariable Long roomId) {
+    public ResultDTO startRecording(@PathVariable Long roomId) {
         try {
             LiveRecording recording = recordingService.startRecording(roomId);
-            return ResponseEntity.ok(recording);
+            return ResultDTO.success("开始录制成功", recording);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResultDTO.error(ResponseCodeEnum.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             log.error("开始录制直播异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "开始录制直播异常");
         }
     }
 
@@ -170,15 +163,15 @@ public class LiveController {
      * 停止录制直播
      */
     @PostMapping("/record/{recordingId}/stop")
-    public ResponseEntity<LiveRecording> stopRecording(@PathVariable Long recordingId) {
+    public ResultDTO stopRecording(@PathVariable Long recordingId) {
         try {
             LiveRecording recording = recordingService.stopRecording(recordingId);
-            return ResponseEntity.ok(recording);
+            return ResultDTO.success("停止录制成功", recording);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResultDTO.error(ResponseCodeEnum.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             log.error("停止录制直播异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "停止录制直播异常");
         }
     }
 
@@ -186,16 +179,16 @@ public class LiveController {
      * 获取直播回放列表
      */
     @GetMapping("/room/{roomId}/recordings")
-    public ResponseEntity<List<LiveRecording>> getRecordings(
+    public ResultDTO getRecordings(
             @PathVariable Long roomId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         try {
             List<LiveRecording> recordings = recordingService.getRecordings(roomId, page, size);
-            return ResponseEntity.ok(recordings);
+            return ResultDTO.success("获取直播回放列表成功", recordings);
         } catch (Exception e) {
             log.error("获取直播回放列表异常", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播回放列表异常");
         }
     }
 }

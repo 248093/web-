@@ -1,7 +1,10 @@
 package top.lyh.service.serviceImpl;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.entity.pojo.LiveStream;
+import top.lyh.entity.pojo.SysUser;
 import top.lyh.mapper.LiveRecordingMapper;
 import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.mapper.LiveStreamMapper;
@@ -64,9 +68,25 @@ public class LiveStreamServiceImpl implements LiveStreamService {
     @Override
     @Transactional
     public LiveRoom startLiveStream(Long roomId) {
+        // 获取当前用户
+        Subject currentUser = SecurityUtils.getSubject();
+        Object principal = currentUser.getPrincipal();
+        SysUser user = (SysUser) principal;
         LiveRoom liveRoom = liveRoomMapper.selectById(roomId);
         if (liveRoom == null) {
             throw new IllegalArgumentException("直播间不存在");
+        }
+        QueryWrapper<LiveRoom> queryWrapper1 = new QueryWrapper<>();
+        queryWrapper1.eq("user_id", user.getId());
+        LiveRoom liveRoom1 = liveRoomMapper.selectOne(queryWrapper1);
+        log.info("当前用户: {}, 查询到的直播间: {}", user, liveRoom1);
+        if (liveRoom1 == null) {
+            log.warn("未找到当前用户创建的直播间，用户ID: {}", user.getId());
+            throw new IllegalArgumentException("未找到当前用户创建的直播间，请先创建直播间");
+        }
+        if (!user.getId().equals(liveRoom.getUserId())) {
+            log.warn("用户ID不匹配，当前用户: {}, 直播间所属用户: {}", user.getId(), liveRoom.getUserId());
+            throw new IllegalArgumentException("用户ID不匹配，当前用户无权操作该直播间");
         }
 
         // 更新直播间状态为直播中

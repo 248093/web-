@@ -9,7 +9,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-    
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 启用简单的消息代理
@@ -17,12 +17,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // 设置应用程序前缀
         registry.setApplicationDestinationPrefixes("/app");
     }
-    
+
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 注册STOMP端点
         registry.addEndpoint("/ws-live")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOriginPatterns("*");
     }
 }

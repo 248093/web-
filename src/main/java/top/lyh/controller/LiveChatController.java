@@ -1,6 +1,11 @@
 package top.lyh.controller;
 
+import jakarta.validation.constraints.Size;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresAuthentication;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -15,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Controller
+@Slf4j
 public class LiveChatController {
     
     @Autowired
@@ -35,9 +41,10 @@ public class LiveChatController {
 //        if (liveRoom == null || liveRoom.getStatus() != 1) {
 //            return;
 //        }
-//
+
         // 设置消息时间
         message.setTimestamp(LocalDateTime.now());
+        log.info("Received message: {}", message);
         
         // 发送消息到订阅该直播间的所有客户端
         messagingTemplate.convertAndSend("/topic/chat/" + roomId, message);
@@ -58,6 +65,7 @@ public class LiveChatController {
     /**
      * 发送直播点赞通知
      */
+    @RequiresAuthentication
     @MessageMapping("/like/{roomId}")
     public void sendLike(@DestinationVariable Long roomId, Map<String, Object> payload) {
         // 检查直播间是否存在
@@ -89,9 +97,10 @@ public class LiveChatController {
     @Data
     public static class ChatMessage {
         private String username;
-        private String userId;
+        private Long userId;
+        @Size(max = 25, message = "内容长度不能超过25个字符")
         private String content;
-        private String avatar;
         private LocalDateTime timestamp;
+        private Integer type;
     }
 }

@@ -23,9 +23,9 @@ public class UserLoginDTO implements Serializable {
      * 密码（加密后存储，如 BCrypt）
      */
     @NotEmpty
-    @Pattern(
-            regexp = "^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z\\d]{1,16}$", // 核心：Java 正则表达式
-            message = "密码必须是1-16位字母数字组合（需同时包含字母和数字）"
-    )
+//    @Pattern(
+//            regexp = "^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z\\d]{1,16}$", // 核心：Java 正则表达式
+//            message = "数密码必须是1-16位字母数字组合（需同时包含字母和字）"
+//    )
     private String password;
 }
