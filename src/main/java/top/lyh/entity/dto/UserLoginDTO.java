@@ -28,4 +28,6 @@ public class UserLoginDTO implements Serializable {
 //            message = "数密码必须是1-16位字母数字组合（需同时包含字母和字）"
 //    )
     private String password;
+
+    private String roleCode;
 }

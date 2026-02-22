@@ -108,6 +108,11 @@ public class SysUser {
     private BigDecimal accountMoney;
 
     /**
+     * 头像
+     */
+    private String avatar;
+
+    /**
      * 创建时间（注册时间）
      */
     private Date createTime;

@@ -6,6 +6,10 @@ spring:
     allow-bean-definition-overriding: true
   application:
     name: live-streaming-service
+  # 类型转换配置
+  coercion-config:
+    enums:
+      from-string-coercion: TRY_CONVERT
 
   # 数据库配置
   datasource:
@@ -58,3 +62,18 @@ lyh:
     accountToken: ${sms.account.token}
     appId: ${sms.app.id}
     templateId: ${sms.template.id}
+
+# 阿里云 OSS 配置
+aliyun:
+  oss:
+    endpoint: ${oss.endpoint}
+    accessKeyId: ${oss.accessKeyId}
+    accessKeySecret: ${oss.accessKeySecret}
+    bucketName: ${oss.bucketName}
+
+# 沙盒支付配置
+alipay:
+  appId: ${pay.alipay.appId}
+  appPrivateKey: ${pay.alipay.appPrivateKey}
+  alipayPublicKey: ${pay.alipay.alipayPublicKey}
+  notifyUrl: ${pay.alipay.notifyUrl}

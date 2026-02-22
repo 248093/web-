@@ -1,6 +1,7 @@
 package top.lyh.service.serviceImpl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +20,7 @@ import java.util.List;
 
 @Service
 @Slf4j
-public class LiveRoomServiceImpl implements LiveRoomService {
+public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> implements LiveRoomService {
     
     @Autowired
     private LiveRoomMapper liveRoomMapper;

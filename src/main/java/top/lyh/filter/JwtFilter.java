@@ -36,7 +36,12 @@ public class JwtFilter extends AccessControlFilter {
             "/ws-live/**",           // ✅ 支持通配符
             "/api/srs/callback/**",  // ✅ 支持通配符
             "/error",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/api/gift/**",
+            "/api/live/room/*/online/increment",
+            "/api/live/room/*/online/decrement",
+            "/api/live/room/*/online/count",
+            "/notify"
     );
 
     @Autowired

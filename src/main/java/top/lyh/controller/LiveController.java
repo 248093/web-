@@ -3,6 +3,7 @@ package top.lyh.controller;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresRoles;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import top.lyh.common.ResponseCodeEnum;
@@ -14,6 +15,7 @@ import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.service.LiveRecordingService;
 import top.lyh.service.LiveRoomService;
 import top.lyh.service.LiveStreamService;
+import top.lyh.utils.RedisUtil;
 
 import java.util.List;
 
@@ -30,6 +32,8 @@ public class LiveController {
 
     @Autowired
     private LiveRoomService liveRoomService;
+    @Autowired
+    private RedisUtil redisTemplate;
 
     /**
      * 创建直播间
@@ -142,6 +146,53 @@ public class LiveController {
             return ResultDTO.error(ResponseCodeEnum.ERROR, "增加观看人数异常");
         }
     }
+    /**
+     * 增加直播间在线人数
+     */
+    @PostMapping("/room/{roomId}/online/increment")
+    public ResultDTO incrementOnlineCount(@PathVariable Long roomId) {
+        try {
+            String key = "live:room:" + roomId + ":online_count";
+            redisTemplate.incr( key, 1);
+            return ResultDTO.success("在线人数增加成功");
+        } catch (Exception e) {
+            log.error("增加在线人数失败，roomId: {}", roomId, e);
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "增加在线人数失败");
+        }
+    }
+
+    /**
+     * 减少直播间在线人数
+     */
+    @PostMapping("/room/{roomId}/online/decrement")
+    public ResultDTO decrementOnlineCount(@PathVariable Long roomId) {
+        log.info("直播间Id: {}", roomId);
+        try {
+            String key = "live:room:" + roomId + ":online_count";
+            redisTemplate.decr(key,1);
+            return ResultDTO.success("在线人数减少成功");
+        } catch (Exception e) {
+            log.error("减少在线人数失败，roomId: {}", roomId, e);
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "减少在线人数失败");
+        }
+    }
+    /**
+     * 获取直播间在线人数
+     */
+    @GetMapping("/room/{roomId}/online/count")
+    public ResultDTO getOnlineCount(@PathVariable Long roomId) {
+        try {
+            String key = "live:room:" + roomId + ":online_count";
+            Integer countStr = (Integer) redisTemplate.get( key);
+            long count = countStr != null ? Long.valueOf(countStr) : 0;
+            return ResultDTO.success("获取在线人数成功", count);
+        } catch (Exception e) {
+            log.error("获取在线人数失败，roomId: {}", roomId, e);
+            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取在线人数失败");
+        }
+    }
+
+
 
     /**
      * 开始录制直播

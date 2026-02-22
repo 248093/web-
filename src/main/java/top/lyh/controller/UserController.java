@@ -67,11 +67,17 @@ public class UserController {
 
         // 4. 生成JWT Token
         String token = jwtUtil.generateToken(user.getUserName());
-        // 5. 返回登录成功信息
+
+        // 5. 构建完整的用户信息返回
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
+        result.put("id", user.getId());
         result.put("userName", user.getUserName());
-        result.put("userId", user.getId());
+        result.put("phone", user.getPhone());
+        result.put("email", user.getEmail());
+        result.put("sex", user.getSex());
+        result.put("avatar", user.getAvatar());
+        result.put("accountMoney", user.getAccountMoney());
         response.setHeader(JwtUtil.HEADER, token);
         return ResultDTO.success("登录成功", result);
     }
@@ -123,6 +129,10 @@ public class UserController {
         } catch (Exception e) {
             log.error("标记token过期失败", e);
         }
+    }
+    @GetMapping("/getUserInfo")
+    public ResultDTO getUserInfo(@RequestParam Long userId) {
+        return ResultDTO.success(sysUserService.getById(userId));
     }
 
 }

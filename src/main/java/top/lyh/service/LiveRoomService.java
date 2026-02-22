@@ -1,12 +1,13 @@
 package top.lyh.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.entity.pojo.LiveRoom;
 
 import java.util.List;
 
-public interface LiveRoomService {
+public interface LiveRoomService extends IService<LiveRoom> {
     
     /**
      * 创建直播间
