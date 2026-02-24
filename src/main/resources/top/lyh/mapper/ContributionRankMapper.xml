@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="top.lyh.mapper.ContributionRankMapper">
+
+    <!-- 定义 ContributionRankResult 映射规则 -->
+    <resultMap id="ContributionRankResult" type="top.lyh.entity.vo.ContributionRankVo">
+        <id property="userId" column="user_id"/>
+        <result property="username" column="user_name"/>
+        <result property="avatar" column="avatar"/>
+        <result property="totalAmount" column="total_amount"/>
+    </resultMap>
+    <!-- 7. 删除7天前的数据 -->
+    <delete id="deleteExpiredContributions">
+        DELETE FROM contribution_rank
+    </delete>
+    <!-- 1. 查询直播间近7天贡献榜（累计） -->
+    <select id="getWeeklyContributionRank" resultMap="ContributionRankResult">
+        SELECT
+        u.id AS user_id,
+        u.user_name,
+        u.avatar,
+        SUM(gc.total_amount) AS total_amount,
+        ROW_NUMBER() OVER (ORDER BY SUM(gc.total_amount) DESC) AS `rank`
+        FROM contribution_rank gc
+        INNER JOIN sys_user u ON gc.sender_id = u.id
+        WHERE gc.live_room_id = #{liveRoomId}
+        GROUP BY u.id, u.user_name, u.avatar
+        ORDER BY total_amount DESC
+        LIMIT 50
+    </select>
+</mapper>
