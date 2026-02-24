@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.pojo.Gift;
+import top.lyh.entity.pojo.GiftSendRecord;
 import top.lyh.entity.vo.ContributionRankVo;
 import top.lyh.service.ContributionRankService;
 import top.lyh.service.GiftService;
@@ -39,6 +40,11 @@ public class GiftController {
     public ResultDTO weeklyRank(@RequestParam Long liveRoomId) {
         List<ContributionRankVo> weeklyContributionRank = contributionRankService.getWeeklyContributionRank(liveRoomId);
         return ResultDTO.success(weeklyContributionRank);
+    }
+    @PostMapping("/sendGift")
+    public ResultDTO sendGift(@RequestBody GiftSendRecord giftSendRecord) throws Exception {
+        boolean b = giftService.sendGift(giftSendRecord);
+        return b ? ResultDTO.success("发送成功!") : ResultDTO.error("发送失败！");
     }
 
 }

@@ -9,12 +9,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
+import top.lyh.common.PageResult;
 import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.service.LiveRoomService;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -60,7 +62,7 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         // 设置初始状态
         liveRoom.setStatus(0); // 未开播
         liveRoom.setViewCount(0L);
-        liveRoom.setLikeCount(0L);
+        liveRoom.setAmountCount(BigDecimal.valueOf(0.0));
         liveRoom.setCreatedAt(LocalDateTime.now());
         liveRoom.setUpdatedAt(LocalDateTime.now());
         
@@ -92,36 +94,20 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
      * 分页查询直播间列表
      */
     @Override
-    public List<LiveRoomDetailVo> getActiveLiveRooms(LiveRoomQueryDto query) {
+    public PageResult<LiveRoomDetailVo> getActiveLiveRooms(LiveRoomQueryDto query) {
         try {
             // 计算分页参数
             int offset = (query.getPage() - 1) * query.getSize();
-            
+            List<LiveRoomDetailVo> records = liveRoomMapper.selectByCondition(query, query.getSize(), offset);
+            Long total  = liveRoomMapper.countByCondition(query);
             // 调用Mapper查询
-            return liveRoomMapper.selectByCondition(query, query.getSize(), offset);
+            return new PageResult<>(records,total,query.getPage(),query.getSize());
         } catch (Exception e) {
             log.error("查询活跃直播间失败", e);
             throw new RuntimeException("查询直播间列表失败", e);
         }
     }
-    
-    /**
-     * 获取热门直播间（使用综合评分排序）
-     */
-    @Override
-    public List<LiveRoom> getHotLiveRooms(int limit) {
-        try {
-            QueryWrapper<LiveRoom> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("status", 1) // 直播中
-                    .orderByDesc("view_count") // 按观看人数排序
-                    .last("LIMIT " + limit);
-            
-            return liveRoomMapper.selectList(queryWrapper);
-        } catch (Exception e) {
-            log.error("获取热门直播间失败", e);
-            throw new RuntimeException("获取热门直播间失败", e);
-        }
-    }
+
     
     /**
      * 更新直播间状态
@@ -151,71 +137,8 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
             throw new RuntimeException("更新直播间状态失败", e);
         }
     }
-    
-    /**
-     * 增加直播间观看人数
-     */
-    @Override
-    @Transactional
-    public void incrementViewCount(Long roomId) {
-        try {
-            // 使用Redis进行计数
-            String key = "live:room:" + roomId + ":view_count";
-            redisTemplate.opsForValue().increment(key);
-            
-            // 定期同步到数据库（减少数据库压力）
-            if (Math.random() < 0.1) {  // 10%概率同步
-                String countStr = redisTemplate.opsForValue().get(key);
-                if (countStr != null) {
-                    long count = Long.parseLong(countStr);
-                    
-                    LiveRoom room = new LiveRoom();
-                    room.setId(roomId);
-                    room.setViewCount(count);
-                    room.setUpdatedAt(LocalDateTime.now());
-                    
-                    liveRoomMapper.updateById(room);
-                    
-                    log.debug("同步观看人数到数据库，roomId: {}, count: {}", roomId, count);
-                }
-            }
-        } catch (Exception e) {
-            log.error("增加观看人数失败，roomId: {}", roomId, e);
-        }
-    }
-    
-    /**
-     * 增加直播间点赞数
-     */
-    @Override
-    @Transactional
-    public void incrementLikeCount(Long roomId) {
-        try {
-            // 使用Redis进行计数
-            String key = "live:room:" + roomId + ":like_count";
-            redisTemplate.opsForValue().increment(key);
-            
-            // 定期同步到数据库
-            if (Math.random() < 0.2) {  // 20%概率同步（点赞比观看频率低）
-                String countStr = redisTemplate.opsForValue().get(key);
-                if (countStr != null) {
-                    long count = Long.parseLong(countStr);
-                    
-                    LiveRoom room = new LiveRoom();
-                    room.setId(roomId);
-                    room.setLikeCount(count);
-                    room.setUpdatedAt(LocalDateTime.now());
-                    
-                    liveRoomMapper.updateById(room);
-                    
-                    log.debug("同步点赞数到数据库，roomId: {}, count: {}", roomId, count);
-                }
-            }
-        } catch (Exception e) {
-            log.error("增加点赞数失败，roomId: {}", roomId, e);
-        }
-    }
-    
+
+
     /**
      * 获取直播间详情VO
      */

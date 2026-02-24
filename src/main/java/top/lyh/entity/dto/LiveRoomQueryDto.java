@@ -61,5 +61,5 @@ public class LiveRoomQueryDto {
     /**
      * 分类
      * */
-    private String category;
+    private Long categoryId;
 }

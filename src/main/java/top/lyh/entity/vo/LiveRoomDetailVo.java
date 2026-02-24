@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -54,7 +55,7 @@ public class LiveRoomDetailVo {
     /**
      * 点赞数
      */
-    private Long likeCount;
+    private BigDecimal amountCount;
 
     /**
      * 开播时间
@@ -63,5 +64,9 @@ public class LiveRoomDetailVo {
     /**
      * 直播分类
      */
-    private String category;
+    private Long categoryId;
+    /**
+     * 主播头像
+     */
+    private String anchorAvatar;
 }

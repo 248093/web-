@@ -1,6 +1,7 @@
 package top.lyh.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.springframework.web.multipart.MultipartFile;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.dto.UserRegisterDTO;
 import top.lyh.entity.pojo.SysUser;
@@ -32,5 +33,6 @@ public interface SysUserService extends IService<SysUser> {
      */
     Set<String> findPermissions(String userName);
     ResultDTO addUser(UserRegisterDTO userRegisterDTO);
-
+    public ResultDTO updateUser(SysUser user);
+    ResultDTO updateUserPhone(Long userId, String newPhone);
 }

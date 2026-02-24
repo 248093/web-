@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -32,7 +33,7 @@ public class LiveRoom {
     
     private Long viewCount;    // 观看人数
     
-    private Long likeCount;    // 点赞数
+    private BigDecimal amountCount;    // 贡献值
     
     private LocalDateTime startTime;  // 开播时间
     
@@ -42,5 +43,5 @@ public class LiveRoom {
     
     private LocalDateTime updatedAt;
 
-    private String category;
+    private Long categoryId;
 }

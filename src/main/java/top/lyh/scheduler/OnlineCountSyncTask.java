@@ -27,8 +27,8 @@ public class OnlineCountSyncTask {
     @Autowired
     private LiveRoomService liveRoomService; // 注入Service用于批量操作
 
-    // 定时任务：每15分钟执行一次
-    @Scheduled(fixedRate = 900000)
+    // 定时任务：每3分钟执行一次
+    @Scheduled(fixedRate = 18000)
     public void syncOnlineCountToDatabase() {
         long startTime = System.currentTimeMillis();
         int successCount = 0;

@@ -45,7 +45,6 @@ public class SysUser {
     /**
      * 真实姓名
      */
-    @JsonIgnore
     private String trueName;
 
     /**

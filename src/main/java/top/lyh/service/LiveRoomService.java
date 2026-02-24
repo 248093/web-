@@ -1,6 +1,7 @@
 package top.lyh.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import top.lyh.common.PageResult;
 import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.entity.pojo.LiveRoom;
@@ -22,27 +23,14 @@ public interface LiveRoomService extends IService<LiveRoom> {
     /**
      * 分页查询直播间列表
      */
-    List<LiveRoomDetailVo> getActiveLiveRooms(LiveRoomQueryDto query);
-    
-    /**
-     * 获取热门直播间
-     */
-    List<LiveRoom> getHotLiveRooms(int limit);
+    PageResult<LiveRoomDetailVo> getActiveLiveRooms(LiveRoomQueryDto query);
+
     
     /**
      * 更新直播间状态
      */
     boolean updateStatus(Long roomId, Integer status);
-    
-    /**
-     * 增加直播间观看人数
-     */
-    void incrementViewCount(Long roomId);
-    
-    /**
-     * 增加直播间点赞数
-     */
-    void incrementLikeCount(Long roomId);
+
     
     /**
      * 获取直播间详情VO

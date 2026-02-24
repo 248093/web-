@@ -4,17 +4,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.checkerframework.checker.units.qual.A;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import top.lyh.common.PageResult;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
+import top.lyh.entity.pojo.SysUser;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.service.LiveRecordingService;
 import top.lyh.service.LiveRoomService;
 import top.lyh.service.LiveStreamService;
+import top.lyh.service.SysUserService;
 import top.lyh.utils.RedisUtil;
 
 import java.util.List;
@@ -32,6 +36,8 @@ public class LiveController {
 
     @Autowired
     private LiveRoomService liveRoomService;
+    @Autowired
+    private SysUserService sysUserService;
     @Autowired
     private RedisUtil redisTemplate;
 
@@ -60,7 +66,11 @@ public class LiveController {
             if (liveRoom == null) {
                 return ResultDTO.error(ResponseCodeEnum.NOT_FOUND, "直播间不存在");
             }
-            return ResultDTO.success("获取直播间详情成功", liveRoom);
+            SysUser host = sysUserService.getById(liveRoom.getUserId());
+            LiveRoomDetailVo liveRoomDetailVo = new LiveRoomDetailVo();
+            liveRoomDetailVo.setAnchorAvatar(host.getAvatar());
+            BeanUtils.copyProperties(liveRoom, liveRoomDetailVo);
+            return ResultDTO.success("获取直播间详情成功", liveRoomDetailVo);
         } catch (Exception e) {
             log.error("获取直播间详情异常", e);
             return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播间详情异常");
@@ -109,9 +119,9 @@ public class LiveController {
     public ResultDTO getLiveRooms(@RequestBody LiveRoomQueryDto query) {
         try {
             if (query.getPage() == null) query.setPage(1);
-            if (query.getSize() == null) query.setSize(10);
+            if (query.getSize() == null) query.setSize(12);
 
-            List<LiveRoomDetailVo> rooms = liveRoomService.getActiveLiveRooms(query);
+            PageResult<LiveRoomDetailVo> rooms = liveRoomService.getActiveLiveRooms(query);
             return ResultDTO.success("获取直播间列表成功", rooms);
         } catch (Exception e) {
             log.error("获取直播间列表异常", e);
@@ -119,33 +129,6 @@ public class LiveController {
         }
     }
 
-    /**
-     * 获取热门直播间
-     */
-    @GetMapping("/rooms/hot")
-    public ResultDTO getHotLiveRooms(@RequestParam(defaultValue = "10") int limit) {
-        try {
-            List<LiveRoom> rooms = liveRoomService.getHotLiveRooms(limit);
-            return ResultDTO.success("获取热门直播间成功", rooms);
-        } catch (Exception e) {
-            log.error("获取热门直播间异常", e);
-            return ResultDTO.error(ResponseCodeEnum.ERROR, "获取热门直播间异常");
-        }
-    }
-
-    /**
-     * 增加观看人数
-     */
-    @PostMapping("/room/{roomId}/view")
-    public ResultDTO incrementViewCount(@PathVariable Long roomId) {
-        try {
-            liveRoomService.incrementViewCount(roomId);
-            return ResultDTO.success("增加观看人数成功");
-        } catch (Exception e) {
-            log.error("增加观看人数异常", e);
-            return ResultDTO.error(ResponseCodeEnum.ERROR, "增加观看人数异常");
-        }
-    }
     /**
      * 增加直播间在线人数
      */
@@ -169,7 +152,14 @@ public class LiveController {
         log.info("直播间Id: {}", roomId);
         try {
             String key = "live:room:" + roomId + ":online_count";
-            redisTemplate.decr(key,1);
+            Object currentCount = redisTemplate.get(key);
+            // 一行搞定：任何类型都转成字符串再解析为Long
+            long count = currentCount != null ? Long.parseLong(currentCount.toString()) : 0L;
+
+            if (count > 0) {
+                redisTemplate.decr(key, 1);
+            }
+
             return ResultDTO.success("在线人数减少成功");
         } catch (Exception e) {
             log.error("减少在线人数失败，roomId: {}", roomId, e);
@@ -183,8 +173,8 @@ public class LiveController {
     public ResultDTO getOnlineCount(@PathVariable Long roomId) {
         try {
             String key = "live:room:" + roomId + ":online_count";
-            Integer countStr = (Integer) redisTemplate.get( key);
-            long count = countStr != null ? Long.valueOf(countStr) : 0;
+            Object value = redisTemplate.get(key);
+            long count = value != null ? Long.parseLong(value.toString()) : 0L;
             return ResultDTO.success("获取在线人数成功", count);
         } catch (Exception e) {
             log.error("获取在线人数失败，roomId: {}", roomId, e);

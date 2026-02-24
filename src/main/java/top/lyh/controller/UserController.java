@@ -2,6 +2,7 @@ package top.lyh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.jsonwebtoken.Claims;
+import io.micrometer.common.util.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -13,12 +14,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.dto.UserLoginDTO;
 import top.lyh.entity.dto.UserRegisterDTO;
 import top.lyh.entity.pojo.SysUser;
 import top.lyh.service.SendMessageService;
 import top.lyh.service.SysUserService;
+import top.lyh.utils.AliOSSUtils;
 import top.lyh.utils.JwtUtil;
 import top.lyh.utils.RedisUtil;
 import top.lyh.validatio.PhoneNumber;
@@ -26,6 +29,7 @@ import top.lyh.validatio.PhoneNumber;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -40,6 +44,8 @@ public class UserController {
     private SendMessageService sendMessageService;
     @Autowired
     private RedisUtil redisUtil;
+    @Autowired
+    private AliOSSUtils aliOSSUtils;
     @PostMapping("/login")
     public ResultDTO login(@RequestBody @Validated UserLoginDTO userLoginDTO, HttpServletResponse response) {
         // 1. 验证用户是否存在
@@ -51,6 +57,11 @@ public class UserController {
         // 2. 验证账户状态
         if (user.getEnabled() == null || user.getEnabled() != 1) {
             return ResultDTO.error("账户已被锁定");
+        }
+        // 验证账户角色是否匹配
+        Set<String> roles = sysUserService.findRoles(user.getUserName());
+        if (!roles.contains(userLoginDTO.getRoleCode())) {
+            return ResultDTO.error("用户角色不匹配");
         }
 
         // 3. 验证密码
@@ -78,6 +89,7 @@ public class UserController {
         result.put("sex", user.getSex());
         result.put("avatar", user.getAvatar());
         result.put("accountMoney", user.getAccountMoney());
+        result.put("roleCode", userLoginDTO.getRoleCode());
         response.setHeader(JwtUtil.HEADER, token);
         return ResultDTO.success("登录成功", result);
     }
@@ -133,6 +145,73 @@ public class UserController {
     @GetMapping("/getUserInfo")
     public ResultDTO getUserInfo(@RequestParam Long userId) {
         return ResultDTO.success(sysUserService.getById(userId));
+    }
+    // 或者使用 JSON + 文件的方式
+    @PostMapping("/updateUser")
+    public ResultDTO updateUser(
+            @RequestBody SysUser user) {
+        log.info("更新用户信息: {}", user);
+        return sysUserService.updateUser(user);
+    }
+    @GetMapping("/check")
+    public ResultDTO check(@RequestParam String userName) {
+        if (sysUserService.findByUsername(userName) != null){
+            return ResultDTO.error("用户名已存在");
+        }else {
+            return ResultDTO.success("用户名可用");
+        }
+    }
+    @PostMapping("/uploadAvatar")
+    public ResultDTO uploadAvatar(@RequestParam MultipartFile file) {
+        try {
+            String url = aliOSSUtils.upload(file, "avatar");
+            return ResultDTO.success("上传成功", url);
+        } catch (Exception e) {
+            log.error("上传失败", e);
+            return ResultDTO.error("上传失败");
+        }
+    }
+    @PostMapping("/updatePhone")
+    public ResultDTO updatePhone(@RequestParam Long userId,
+                                 @RequestParam String oldPhone,
+                                 @RequestParam String newPhone,
+                                 @RequestParam String phoneCode) {
+        try {
+            // 参数校验
+            if (userId == null || StringUtils.isBlank(newPhone) || StringUtils.isBlank(phoneCode)) {
+                return ResultDTO.error("参数不能为空");
+            }
+
+            // 验证手机号格式
+            if (!newPhone.matches("^1[3-9]\\d{9}$")) {
+                return ResultDTO.error("手机号格式不正确");
+            }
+
+            // 验证验证码
+            Object codeObj = redisUtil.get("phone:" + oldPhone);
+            String validCodeInRedis = codeObj != null ? codeObj.toString() : null;
+
+            if (StringUtils.isBlank(validCodeInRedis)) {
+                return ResultDTO.error("验证码不存在或已过期，请重新获取");
+            }
+
+            if (!validCodeInRedis.equals(phoneCode)) {
+                return ResultDTO.error("验证码输入错误，请重新输入");
+            }
+
+            // 调用服务层方法更新手机号
+            ResultDTO result = sysUserService.updateUserPhone(userId, newPhone);
+
+            // 如果更新成功，清除验证码
+            if (result.getCode() == 200) {
+                redisUtil.del("phone:" + newPhone);
+            }
+
+            return result;
+        } catch (Exception e) {
+            log.error("修改手机号异常", e);
+            return ResultDTO.error("修改手机号失败");
+        }
     }
 
 }

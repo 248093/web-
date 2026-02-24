@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import top.lyh.entity.dto.LiveRoomQueryDto;
+import top.lyh.entity.vo.CategoryCountVO;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.entity.pojo.LiveRoom;
 
@@ -27,4 +28,13 @@ public interface LiveRoomMapper extends BaseMapper<LiveRoom> {
             @Param("limit") Integer limit,
             @Param("offset") Integer offset
     );
+
+    /**
+     * 获取各分类的直播间数量统计
+     */
+    List<CategoryCountVO> selectCategoryRoomCount();
+    /**
+     * 统计符合条件的总记录数
+     */
+    Long countByCondition(@Param("query") LiveRoomQueryDto query);
 }

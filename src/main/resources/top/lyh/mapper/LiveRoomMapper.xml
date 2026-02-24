@@ -12,9 +12,9 @@
         <result property="hlsUrl" column="hls_url"/>
         <result property="status" column="status"/>
         <result property="viewCount" column="view_count"/>
-        <result property="likeCount" column="like_count"/>
+        <result property="amountCount" column="amount_count"/>
         <result property="startTime" column="start_time"/>
-        <result property="category" column="category"/>
+        <result property="categoryId" column="category_id"/>
     </resultMap>
 
     <!-- 动态条件查询直播间列表（唯一的核心查询方法） -->
@@ -25,12 +25,13 @@
         lr.cover_url,
         lr.user_id,
         su.user_name,
+        su.avatar as anchorAvatar,
         lr.hls_url,
         lr.status,
         lr.view_count,
-        lr.like_count,
+        lr.amount_count,
         lr.start_time,
-        lr.category
+        lr.category_id
         FROM live_room lr
         LEFT JOIN sys_user su ON lr.user_id = su.id
         <where>
@@ -63,8 +64,9 @@
             <if test="query.status != null">
                 AND lr.status = #{query.status}
             </if>
-            <if test="query.category != null">
-                AND lr.category = #{query.category}
+            <!-- 分类ID查询 -->
+            <if test="query.categoryId != null">
+                AND lr.category_id = #{query.categoryId}
             </if>
         </where>
 
@@ -72,12 +74,13 @@
         <if test="query.orderBy != null and query.orderBy != ''">
             ORDER BY
             <choose>
-                <!-- 综合评分排序：view_count * 5 + like_count * 1.5 -->
+                <!-- 综合评分排序：view_count * 5 + amount_count * 1.5 -->
                 <when test="query.orderBy == 'score'">
-                    (lr.view_count * 5 + lr.like_count * 1.5)
+                    (lr.view_count * 5 + lr.amount_count * 1.5)
                 </when>
                 <when test="query.orderBy == 'view_count'">lr.view_count</when>
-                <when test="query.orderBy == 'like_count'">lr.like_count</when>
+                <when test="query.orderBy == 'amount_count'">lr.amount_count</when>
+                <when test="query.orderBy == 'start_time'">lr.start_time</when>
             </choose>
             <choose>
                 <when test="query.orderType != null and query.orderType.toUpperCase() == 'ASC'">ASC</when>
@@ -86,7 +89,7 @@
         </if>
         <if test="query.orderBy == null or query.orderBy == ''">
             <!-- 默认按综合评分排序 -->
-            ORDER BY (lr.view_count * 5 + lr.like_count * 1.5) DESC
+            ORDER BY (lr.view_count * 5 + lr.amount_count * 1.5) DESC
         </if>
 
         <!-- 分页 -->
@@ -97,5 +100,56 @@
             </if>
         </if>
     </select>
+    <!-- 新增：获取各分类的直播间数量统计 -->
+    <select id="selectCategoryRoomCount" resultType="top.lyh.entity.vo.CategoryCountVO">
+        SELECT
+            c.id,
+            c.name,
+            COUNT(lr.id) as count
+        FROM category c
+            LEFT JOIN live_room lr ON c.id = lr.category_id AND lr.status = 1
+        GROUP BY c.id, c.name
+        ORDER BY c.sort_order
+    </select>
+    <!-- 统计符合条件的总记录数 -->
+    <select id="countByCondition" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM live_room lr
+        LEFT JOIN sys_user su ON lr.user_id = su.id
+        <where>
+            <!-- 用户状态筛选 -->
+            <if test="query.enabledOnly == null or query.enabledOnly == true">
+                AND su.enabled = 1
+            </if>
 
+            <!-- 直播间ID -->
+            <if test="query.id != null">
+                AND lr.id = #{query.id}
+            </if>
+
+            <!-- 直播间标题模糊查询 -->
+            <if test="query.title != null and query.title != ''">
+                AND lr.title LIKE CONCAT('%', #{query.title}, '%')
+            </if>
+
+            <!-- 主播用户ID -->
+            <if test="query.userId != null">
+                AND lr.user_id = #{query.userId}
+            </if>
+
+            <!-- 主播用户名模糊查询 -->
+            <if test="query.userName != null and query.userName != ''">
+                AND su.user_name LIKE CONCAT('%', #{query.userName}, '%')
+            </if>
+
+            <!-- 直播状态 -->
+            <if test="query.status != null">
+                AND lr.status = #{query.status}
+            </if>
+            <!-- 分类ID查询 -->
+            <if test="query.categoryId != null">
+                AND lr.category_id = #{query.categoryId}
+            </if>
+        </where>
+    </select>
 </mapper>

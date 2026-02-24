@@ -61,38 +61,6 @@ public class LiveChatController {
         
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/status", payload);
     }
-    
-    /**
-     * 发送直播点赞通知
-     */
-    @RequiresAuthentication
-    @MessageMapping("/like/{roomId}")
-    public void sendLike(@DestinationVariable Long roomId, Map<String, Object> payload) {
-        // 检查直播间是否存在
-        LiveRoom liveRoom = liveRoomMapper.selectById(roomId);
-        if (liveRoom == null || liveRoom.getStatus() != 1) {
-            return;
-        }
-        
-        // 增加点赞数
-        String key = "live:room:" + roomId + ":like_count";
-        Long likeCount = redisTemplate.opsForValue().increment(key);
-        
-        // 定期同步到数据库
-        if (likeCount % 100 == 0) {  // 每100个点赞同步一次
-            LiveRoom room = new LiveRoom();
-            room.setId(roomId);
-            room.setLikeCount(likeCount);
-            liveRoomMapper.updateById(room);
-        }
-        
-        // 添加时间戳
-        payload.put("timestamp", LocalDateTime.now());
-        payload.put("likeCount", likeCount);
-        
-        // 发送点赞通知
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/like", payload);
-    }
 
     @Data
     public static class ChatMessage {
