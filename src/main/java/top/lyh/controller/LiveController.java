@@ -1,12 +1,19 @@
 package top.lyh.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresAuthentication;
 import org.apache.shiro.authz.annotation.RequiresRoles;
+import org.apache.shiro.subject.Subject;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import top.lyh.anno.LogAnnotation;
 import top.lyh.common.PageResult;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.common.ResultDTO;
@@ -15,13 +22,19 @@ import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.entity.pojo.SysUser;
 import top.lyh.entity.vo.LiveRoomDetailVo;
-import top.lyh.service.LiveRecordingService;
-import top.lyh.service.LiveRoomService;
-import top.lyh.service.LiveStreamService;
-import top.lyh.service.SysUserService;
+import top.lyh.service.*;
+import top.lyh.utils.AliOSSUtils;
 import top.lyh.utils.RedisUtil;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/live")
@@ -40,6 +53,10 @@ public class LiveController {
     private SysUserService sysUserService;
     @Autowired
     private RedisUtil redisTemplate;
+    @Autowired
+    private RoomBlacklistService roomBlacklistService;
+    @Autowired
+    private AliOSSUtils aliOSSUtils;
 
     /**
      * 创建直播间
@@ -48,11 +65,16 @@ public class LiveController {
     @PostMapping("/room")
     public ResultDTO createLiveRoom(@RequestBody LiveRoom liveRoom) {
         try {
-            LiveRoom createdRoom = liveRoomService.createLiveRoom(liveRoom);
-            return ResultDTO.success("创建直播间成功", createdRoom);
+            if (liveRoom.getId()== null) {
+                LiveRoom createdRoom = liveRoomService.createLiveRoom(liveRoom);
+                return ResultDTO.success("创建直播间成功", createdRoom);
+            }else {
+                boolean b = liveRoomService.updateLiveRoom(liveRoom);
+                return b ? ResultDTO.success("更新直播间信息成功", liveRoom) : ResultDTO.error(ResponseCodeEnum.ERROR, "更新直播间信息失败");
+            }
         } catch (Exception e) {
             log.error("创建直播间异常", e);
-            return ResultDTO.error(ResponseCodeEnum.ERROR, "创建直播间异常");
+            return ResultDTO.error(ResponseCodeEnum.ERROR, e.getMessage());
         }
     }
 
@@ -76,6 +98,27 @@ public class LiveController {
             return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播间详情异常");
         }
     }
+    // 获得推流地址
+    @GetMapping("/room/get/streamUrl")
+    public ResultDTO getPushUrl() {
+        Subject subject = SecurityUtils.getSubject();
+        log.info("getPushUrl - Subject是否存在: {}", subject != null);
+        log.info("getPushUrl - Subject是否已认证: {}", subject.isAuthenticated());
+        log.info("getPushUrl - Principal: {}", subject.getPrincipal());
+        SysUser sysUser=(SysUser) subject.getPrincipal();
+        log.info("用户Id: {}", sysUser);
+        Long userId = sysUser.getId();
+        LambdaQueryWrapper<LiveRoom> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(LiveRoom::getUserId, userId);
+            LiveRoom liveRoom = liveRoomService.getOne(queryWrapper);
+            log.info("直播间: {}", liveRoom.getStreamUrl());
+        if (liveRoom == null) {
+            return ResultDTO.error(ResponseCodeEnum.NOT_FOUND, "直播间不存在");
+        }
+        return ResultDTO.success("获取成功！",liveRoom.getStreamUrl());
+    }
+
+
 
     /**
      * 开始直播
@@ -136,7 +179,7 @@ public class LiveController {
     public ResultDTO incrementOnlineCount(@PathVariable Long roomId) {
         try {
             String key = "live:room:" + roomId + ":online_count";
-            redisTemplate.incr( key, 1);
+            redisTemplate.incr(key, 1);
             return ResultDTO.success("在线人数增加成功");
         } catch (Exception e) {
             log.error("增加在线人数失败，roomId: {}", roomId, e);
@@ -166,6 +209,7 @@ public class LiveController {
             return ResultDTO.error(ResponseCodeEnum.ERROR, "减少在线人数失败");
         }
     }
+
     /**
      * 获取直播间在线人数
      */
@@ -181,7 +225,6 @@ public class LiveController {
             return ResultDTO.error(ResponseCodeEnum.ERROR, "获取在线人数失败");
         }
     }
-
 
 
     /**
@@ -230,6 +273,17 @@ public class LiveController {
         } catch (Exception e) {
             log.error("获取直播回放列表异常", e);
             return ResultDTO.error(ResponseCodeEnum.ERROR, "获取直播回放列表异常");
+        }
+    }
+    @PostMapping("/uploadAvatar")
+    @LogAnnotation(value = "上传直播封面头像", recordParams = false, recordResult = true)
+    public ResultDTO uploadAvatar(@RequestParam MultipartFile file) {
+        try {
+            String url = aliOSSUtils.upload(file, "liveCover");
+            return ResultDTO.success("上传成功", url);
+        } catch (Exception e) {
+            log.error("上传失败", e);
+            return ResultDTO.error("上传失败");
         }
     }
 }

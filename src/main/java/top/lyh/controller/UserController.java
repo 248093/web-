@@ -9,16 +9,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresAuthentication;
 import org.apache.shiro.crypto.hash.SimpleHash;
+import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.ByteSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import top.lyh.anno.LogAnnotation;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.dto.UserLoginDTO;
 import top.lyh.entity.dto.UserRegisterDTO;
 import top.lyh.entity.pojo.SysUser;
+import top.lyh.service.DailyVisitStatService;
 import top.lyh.service.SendMessageService;
 import top.lyh.service.SysUserService;
 import top.lyh.utils.AliOSSUtils;
@@ -43,10 +46,14 @@ public class UserController {
     @Autowired
     private SendMessageService sendMessageService;
     @Autowired
+    private DailyVisitStatService dailyVisitStatService;
+    @Autowired
     private RedisUtil redisUtil;
     @Autowired
     private AliOSSUtils aliOSSUtils;
+
     @PostMapping("/login")
+    @LogAnnotation(value = "用户登录", recordParams = false, recordResult = true)
     public ResultDTO login(@RequestBody @Validated UserLoginDTO userLoginDTO, HttpServletResponse response) {
         // 1. 验证用户是否存在
         SysUser user = sysUserService.findByUsername(userLoginDTO.getUserName());
@@ -75,15 +82,15 @@ public class UserController {
         if (!encryptedPassword.equals(user.getPassword())) {
             return ResultDTO.error("密码错误");
         }
-
+        dailyVisitStatService.updateTodayVisitStat(user.getId());
         // 4. 生成JWT Token
         String token = jwtUtil.generateToken(user.getUserName());
-
         // 5. 构建完整的用户信息返回
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
         result.put("id", user.getId());
         result.put("userName", user.getUserName());
+        result.put("trueName", user.getTrueName());
         result.put("phone", user.getPhone());
         result.put("email", user.getEmail());
         result.put("sex", user.getSex());
@@ -95,6 +102,7 @@ public class UserController {
     }
 
     @GetMapping("/logout")
+    @LogAnnotation(value = "用户登出", recordParams = false, recordResult = true)
     public ResultDTO logout(HttpServletRequest request) {
         // 获取token
         String token = request.getHeader(JwtUtil.HEADER);
@@ -117,10 +125,12 @@ public class UserController {
     }
 
     @PostMapping("/register")
+    @LogAnnotation(value = "用户注册", recordParams = false, recordResult = true)
     public ResultDTO register(@RequestBody @Validated UserRegisterDTO userRegisterDTO) {
         return sysUserService.addUser(userRegisterDTO);
     }
     @PutMapping("/sendMessage")
+    @LogAnnotation(value = "发送验证码", recordParams = false, recordResult = true)
     public ResultDTO sendMessage(@Validated @PhoneNumber @RequestParam String phone)
     {
         System.out.println(phone);
@@ -143,17 +153,20 @@ public class UserController {
         }
     }
     @GetMapping("/getUserInfo")
+    @LogAnnotation(value = "获取用户信息", recordParams = false, recordResult = true)
     public ResultDTO getUserInfo(@RequestParam Long userId) {
         return ResultDTO.success(sysUserService.getById(userId));
     }
     // 或者使用 JSON + 文件的方式
     @PostMapping("/updateUser")
+    @LogAnnotation(value = "更新用户信息", recordParams = false, recordResult = true)
     public ResultDTO updateUser(
             @RequestBody SysUser user) {
         log.info("更新用户信息: {}", user);
         return sysUserService.updateUser(user);
     }
     @GetMapping("/check")
+    @LogAnnotation(value = "用户名检查", recordParams = false, recordResult = true)
     public ResultDTO check(@RequestParam String userName) {
         if (sysUserService.findByUsername(userName) != null){
             return ResultDTO.error("用户名已存在");
@@ -162,6 +175,7 @@ public class UserController {
         }
     }
     @PostMapping("/uploadAvatar")
+    @LogAnnotation(value = "上传用户头像", recordParams = false, recordResult = true)
     public ResultDTO uploadAvatar(@RequestParam MultipartFile file) {
         try {
             String url = aliOSSUtils.upload(file, "avatar");
@@ -172,6 +186,7 @@ public class UserController {
         }
     }
     @PostMapping("/updatePhone")
+    @LogAnnotation(value = "更新手机号", recordParams = false, recordResult = true)
     public ResultDTO updatePhone(@RequestParam Long userId,
                                  @RequestParam String oldPhone,
                                  @RequestParam String newPhone,
@@ -211,6 +226,43 @@ public class UserController {
         } catch (Exception e) {
             log.error("修改手机号异常", e);
             return ResultDTO.error("修改手机号失败");
+        }
+    }
+    // 获取数据库用户数量
+    @GetMapping("/getUserCount")
+    public ResultDTO getUserCount() {
+        long count = sysUserService.count();
+        return ResultDTO.success("获取用户数量成功", count);
+    }
+    // 添加测试接口来检查认证状态
+    @GetMapping("/test/auth")
+    public ResultDTO testAuth() {
+        try {
+            Subject subject = SecurityUtils.getSubject();
+            log.info("Subject是否存在: {}", subject != null);
+            log.info("Subject是否已认证: {}", subject.isAuthenticated());
+
+            if (subject.isAuthenticated()) {
+                Object principal = subject.getPrincipal();
+                log.info("Principal对象: {}", principal);
+                log.info("Principal类型: {}", principal != null ? principal.getClass() : "null");
+
+                if (principal instanceof SysUser) {
+                    SysUser user = (SysUser) principal;
+                    return ResultDTO.success("认证成功", Map.of(
+                            "userId", user.getId(),
+                            "username", user.getUserName(),
+                            "isAuthenticated", true
+                    ));
+                } else {
+                    return ResultDTO.error("Principal不是SysUser类型");
+                }
+            } else {
+                return ResultDTO.error("用户未认证");
+            }
+        } catch (Exception e) {
+            log.error("测试认证状态异常", e);
+            return ResultDTO.error("测试失败: " + e.getMessage());
         }
     }
 

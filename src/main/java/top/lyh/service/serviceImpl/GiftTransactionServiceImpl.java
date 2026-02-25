@@ -1,15 +1,18 @@
 package top.lyh.service.serviceImpl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import top.lyh.common.PageResult;
 import top.lyh.entity.pojo.GiftTransaction;
 import top.lyh.mapper.GiftTransactionMapper;
 import top.lyh.service.GiftTransactionService;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -22,6 +25,55 @@ public class GiftTransactionServiceImpl extends ServiceImpl<GiftTransactionMappe
         return this.getOne(wrapper);
     }
 
+    @Override
+    public PageResult<GiftTransaction> getByPage(GiftTransaction giftTransaction) {
+        log.info("分页动态查询：{}", giftTransaction.getCurrent());
+        // 2. 创建 MyBatis-Plus 分页对象
+        Page<GiftTransaction> page = new Page<>(
+                giftTransaction.getCurrent(),
+                giftTransaction.getSize()
+        );
+
+        // 3. 构建查询条件
+        LambdaQueryWrapper<GiftTransaction> wrapper = new LambdaQueryWrapper<>();
+
+        // 用户ID条件
+        if (giftTransaction.getUserId() != null) {
+            wrapper.eq(GiftTransaction::getUserId, giftTransaction.getUserId());
+        }
+
+        // 状态条件
+        if (giftTransaction.getStatus() != null) {
+            wrapper.eq(GiftTransaction::getStatus, giftTransaction.getStatus());
+        }
+
+        // 支付类型条件
+        if (giftTransaction.getPaymentType() != null) {
+            wrapper.eq(GiftTransaction::getPaymentType, giftTransaction.getPaymentType());
+        }
+        // 4. 排序
+        // 注意：这里应该始终按创建时间倒序排序
+        wrapper.orderByDesc(GiftTransaction::getCreatedAt);
+
+        // 有金额排序需求
+         if (giftTransaction.getAmount() != null) {
+             wrapper.orderByDesc(GiftTransaction::getAmount);
+         }
+
+        // 5. 执行分页查询
+        Page<GiftTransaction> pageData = this.page(page, wrapper);
+         log.info("分页查询结果：{}", pageData.getRecords());
+
+        // 6. 创建并返回 PageResult
+        PageResult<GiftTransaction> result = new PageResult<>(
+                pageData.getRecords(),
+                pageData.getTotal(),
+                (int) pageData.getCurrent(),
+                (int) pageData.getSize()
+        );
+
+        return result;
+    }
     /**
      * 创建订单（插入数据）
      */

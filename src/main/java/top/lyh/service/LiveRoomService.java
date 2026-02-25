@@ -6,7 +6,9 @@ import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.entity.pojo.LiveRoom;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface LiveRoomService extends IService<LiveRoom> {
     
@@ -31,13 +33,10 @@ public interface LiveRoomService extends IService<LiveRoom> {
      */
     boolean updateStatus(Long roomId, Integer status);
 
-    
-    /**
-     * 获取直播间详情VO
-     */
-    LiveRoomDetailVo getLiveRoomDetail(Long roomId);
+
     /**
      * 根据streamKey查找直播间
      */
     LiveRoom findByStreamKey(String streamKey);
+    boolean updateLiveRoom(LiveRoom liveRoom);
 }

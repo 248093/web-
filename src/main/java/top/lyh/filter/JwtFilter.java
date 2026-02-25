@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authz.AuthorizationException;
+import org.apache.shiro.subject.Subject;
 import org.apache.shiro.web.filter.AccessControlFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -32,16 +33,24 @@ public class JwtFilter extends AccessControlFilter {
             "/api/user/login",
             "/api/user/register",
             "/api/live/rooms",
+            "/api/live/room/*",
             "/api/user/sendMessage",
             "/ws-live/**",           // ✅ 支持通配符
             "/api/srs/callback/**",  // ✅ 支持通配符
             "/error",
             "/favicon.ico",
-            "/api/gift/**",
+            "/api/gift/weeklyRank",
+            "/api/gift/list",
             "/api/live/room/*/online/increment",
             "/api/live/room/*/online/decrement",
             "/api/live/room/*/online/count",
-            "/notify"
+            "/notify",
+            "/api/category/tree",
+            "/api/category/root",
+            "/api/category/sub/**",
+            "/api/category/room-count",
+            "/api/category/count-list",
+            "/api/room/blacklist/check"
     );
 
     @Autowired
@@ -91,6 +100,7 @@ public class JwtFilter extends AccessControlFilter {
         log.info("验证Token: {} {}", request.getMethod(), request.getRequestURI());
 
         String token = request.getHeader(JwtUtil.HEADER);
+        log.info("请求Header中的Token: {}", token);
 
         // 如果token为空，返回401
         if (token == null || token.trim().isEmpty()) {
@@ -108,8 +118,14 @@ public class JwtFilter extends AccessControlFilter {
 
         JwtToken jwtToken = new JwtToken(token);
         try {
-            getSubject(servletRequest, servletResponse).login(jwtToken);
-            log.info("Token验证成功");
+            Subject subject = getSubject(servletRequest, servletResponse);
+            log.info("登录前Subject isAuthenticated: {}", subject.isAuthenticated());
+
+            subject.login(jwtToken);
+
+            log.info("登录后Subject isAuthenticated: {}", subject.isAuthenticated());
+            log.info("登录后Subject Principal: {}", subject.getPrincipal());
+
             return true;
         } catch (AuthenticationException e) {
             log.error("Token认证失败: {}", e.getMessage());

@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.annotation.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import top.lyh.common.PageResult;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @TableName("gift_transaction")  // 指定数据库表名
-public class GiftTransaction {   // 类名改为与业务相关
+public class GiftTransaction{   // 类名改为与业务相关
 
     /**
      * 主键ID
@@ -17,6 +19,11 @@ public class GiftTransaction {   // 类名改为与业务相关
     @TableId(type = IdType.AUTO)  // 自增主键
     private Long id;
 
+    @TableField(exist = false)
+    private Integer current = 1;
+
+    @TableField(exist = false)
+    private Integer size = 10;
 
     /**
      * 交易号

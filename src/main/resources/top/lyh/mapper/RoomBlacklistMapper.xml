@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="top.lyh.mapper.RoomBlacklistMapper">
+
+    <!-- 分页查询黑名单详情 -->
+    <select id="selectBlacklistDetailPage" resultType="top.lyh.entity.vo.RoomBlacklistDetailVo">
+        SELECT
+        rb.id,
+        rb.live_room_id as liveRoomId,
+        lr.title as roomTitle,
+        rb.user_id as userId,
+        su.user_name as userName,
+        su.true_name as userTrueName,
+        su.phone as userPhone,
+        su.avatar as userAvatar,
+        rb.operator_id as operatorId,
+        op.user_name as operatorName,
+        op.true_name as operatorTrueName,
+        rb.reason,
+        rb.create_time as createTime,
+        DATEDIFF(NOW(), rb.create_time) as banDurationDays
+        FROM room_blacklist rb
+        LEFT JOIN live_room lr ON rb.live_room_id = lr.id
+        LEFT JOIN sys_user su ON rb.user_id = su.id
+        LEFT JOIN sys_user op ON rb.operator_id = op.id
+        <where>
+            <if test="query.liveRoomId != null">
+                AND rb.live_room_id = #{query.liveRoomId}
+            </if>
+            <if test="query.userId != null">
+                AND rb.user_id = #{query.userId}
+            </if>
+            <if test="query.operatorId != null">
+                AND rb.operator_id = #{query.operatorId}
+            </if>
+            <if test="query.userName != null and query.userName != ''">
+                AND su.user_name LIKE CONCAT('%', #{query.userName}, '%')
+            </if>
+            <if test="query.userPhone != null and query.userPhone != ''">
+                AND su.phone LIKE CONCAT('%', #{query.userPhone}, '%')
+            </if>
+        </where>
+        ORDER BY
+        <choose>
+            <when test="query.orderBy == 'createTime'">
+                rb.create_time
+            </when>
+            <when test="query.orderBy == 'userName'">
+                su.user_name
+            </when>
+            <when test="query.orderBy == 'roomTitle'">
+                lr.title
+            </when>
+            <otherwise>
+                rb.create_time
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="query.orderType == 'ASC'">
+                ASC
+            </when>
+            <otherwise>
+                DESC
+            </otherwise>
+        </choose>
+    </select>
+
+</mapper>

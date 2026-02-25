@@ -1,5 +1,6 @@
 package top.lyh.service.serviceImpl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -17,8 +18,11 @@ import top.lyh.mapper.LiveRoomMapper;
 import top.lyh.service.LiveRoomService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -35,13 +39,15 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
     
     @Value("${live.srs.hls-url}")
     private String hlsUrl;
-    
+    @Value("${live.srs.server-url}")
+    private String srsServerUrl;
+
     @Value("${live.push.key-check-enabled}")
     private boolean keyCheckEnabled;
-    
-    @Value("${live.push.auth-expire}")
-    private long authExpire;
-    
+
+//    @Value("${live.push.auth-expire}")
+//    private long authExpire;
+
     @Value("${live.push.auth-key}")
     private String authKey;
     
@@ -51,6 +57,12 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
     @Override
     @Transactional
     public LiveRoom createLiveRoom(LiveRoom liveRoom) {
+        LambdaQueryWrapper<LiveRoom> queryWrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<LiveRoom> liveRoomLambdaQueryWrapper = queryWrapper.eq(LiveRoom::getUserId, liveRoom.getUserId());
+        List<LiveRoom> liveRoom1 = liveRoomMapper.selectList(liveRoomLambdaQueryWrapper);
+        if (liveRoom1.size() > 0) {
+            throw new RuntimeException("当前用户已创建直播间");
+        }
         // 生成推流密钥
         String streamKey = generateStreamKey(liveRoom.getUserId());
         liveRoom.setStreamKey(streamKey);
@@ -58,7 +70,7 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         // 构建播放地址（推流地址由LiveStreamService处理）
         liveRoom.setHlsUrl(hlsUrl + "/" + streamKey + ".m3u8");
         liveRoom.setFlvUrl(httpFlvUrl + "/" + streamKey + ".flv");
-        
+        liveRoom.setStreamUrl(srsServerUrl + "/" + streamKey);
         // 设置初始状态
         liveRoom.setStatus(0); // 未开播
         liveRoom.setViewCount(0L);
@@ -81,6 +93,7 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         String baseKey = userId + "_" + System.currentTimeMillis();
         return DigestUtils.md5DigestAsHex(baseKey.getBytes());
     }
+
 
     /**
      * 根据ID获取直播间
@@ -138,25 +151,6 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         }
     }
 
-
-    /**
-     * 获取直播间详情VO
-     */
-    @Override
-    public LiveRoomDetailVo getLiveRoomDetail(Long roomId) {
-        try {
-            LiveRoomQueryDto query = new LiveRoomQueryDto();
-            query.setId(roomId);
-            
-            List<LiveRoomDetailVo> result = liveRoomMapper.selectByCondition(query, 10, 0);
-            
-            return result.isEmpty() ? null : result.get(0);
-        } catch (Exception e) {
-            log.error("获取直播间详情失败，roomId: {}", roomId, e);
-            throw new RuntimeException("获取直播间详情失败", e);
-        }
-    }
-    
     /**
      * 根据streamKey查找直播间
      */
@@ -164,7 +158,7 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         try {
             QueryWrapper<LiveRoom> queryWrapper = new QueryWrapper<>();
             queryWrapper.eq("stream_key", streamKey);
-            
+
             return liveRoomMapper.selectOne(queryWrapper);
         } catch (Exception e) {
             log.error("根据streamKey查找直播间失败，streamKey: {}", streamKey, e);
@@ -220,4 +214,5 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
             throw new RuntimeException("删除直播间失败", e);
         }
     }
+
 }

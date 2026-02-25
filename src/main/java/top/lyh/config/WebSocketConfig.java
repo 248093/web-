@@ -13,7 +13,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 启用简单的消息代理
-        registry.enableSimpleBroker("/topic");
+        registry.enableSimpleBroker("/topic","/user");
         // 设置应用程序前缀
         registry.setApplicationDestinationPrefixes("/app");
     }

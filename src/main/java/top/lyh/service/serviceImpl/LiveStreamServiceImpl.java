@@ -163,14 +163,6 @@ public class LiveStreamServiceImpl implements LiveStreamService {
         }
 
         try {
-            long expireTimestamp = Long.parseLong(expire);
-            long currentTime = System.currentTimeMillis() / 1000;
-
-            // 检查是否过期
-            if (currentTime > expireTimestamp) {
-                return false;
-            }
-
             // 验证token
             String authString = streamKey + "-" + expire + "-" + authKey;
             String calculatedToken = DigestUtils.md5DigestAsHex(authString.getBytes());

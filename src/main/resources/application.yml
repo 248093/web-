@@ -44,8 +44,7 @@ live:
   record:
     save-path: /root/dvr/live  # 业务系统存储录制文件的本地路径，需和SRS的dvr模块配合使用
   push:
-    key-check-enabled: true  # 启用推流鉴权，防止非法推流
-    auth-expire: 86400       # 鉴权密钥有效期24小时（单位：秒）
+    key-check-enabled: false  # 启用推流鉴权，防止非法推流
     auth-key: huan@live@key # 鉴权密钥，需替换为自定义的复杂字符串，用于生成/校验推流token
 
 # MinIO配置

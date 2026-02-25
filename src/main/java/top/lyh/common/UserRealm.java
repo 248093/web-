@@ -72,19 +72,32 @@ public class UserRealm extends AuthorizingRealm {
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
         String jwt = (String) token.getCredentials();
+        log.info("开始认证，JWT Token: {}", jwt);
+
         String username = jwtUtil.getClaimsByToken(jwt).getSubject();
+        log.info("从Token中解析出用户名: {}", username);
+
         // 从数据库获取用户信息
         SysUser sysUser = sysUserService.findByUsername(username);
         if (sysUser == null) {
+            log.warn("用户不存在: {}", username);
             throw new UnknownAccountException("用户不存在");
         }
+
+        log.info("找到用户: ID={}, Username={}", sysUser.getId(), sysUser.getUserName());
+
         if (sysUser.getEnabled() == 0 || StringUtils.isEmpty(sysUser.getEnabled().toString())) {
             throw new LockedAccountException("账户被锁定");
         }
+
         Claims claims = jwtUtil.getClaimsByToken(jwt);
         if (jwtUtil.isTokenExpired(claims.getExpiration())) {
             throw new BaseException(ResponseCodeEnum.BAD_REQUEST, "token过期，请重新登录");
         }
-        return new SimpleAuthenticationInfo(sysUser, jwt, getName());
+
+        // 返回的principal应该是SysUser对象
+        SimpleAuthenticationInfo authInfo = new SimpleAuthenticationInfo(sysUser, jwt, getName());
+        log.info("认证信息创建完成，Principal类型: {}", authInfo.getPrincipals().getPrimaryPrincipal().getClass());
+        return authInfo;
     }
 }

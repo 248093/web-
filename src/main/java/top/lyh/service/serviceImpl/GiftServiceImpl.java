@@ -9,16 +9,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.entity.pojo.*;
+import top.lyh.entity.vo.DailyIncomeVo;
 import top.lyh.exceptionHandler.BaseException;
 import top.lyh.mapper.*;
 import org.springframework.stereotype.Service;
 import top.lyh.service.GiftService;
+import top.lyh.service.GiftTransactionService;
 import top.lyh.utils.AliOSSUtils;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
 * @author lyh
@@ -39,6 +42,8 @@ public class GiftServiceImpl extends ServiceImpl<GiftMapper, Gift>
     private LiveRoomMapper liveRoomMapper;
     @Autowired
     private ContributionRankMapper contributionRankMapper;
+    @Autowired
+    private GiftTransactionMapper giftTransactionMapper;
     @Override
     public boolean saveOrEditGift(Gift gift, MultipartFile file) {
         try {
@@ -92,7 +97,9 @@ public class GiftServiceImpl extends ServiceImpl<GiftMapper, Gift>
             if (sysUser == null) {
                 throw new BaseException(ResponseCodeEnum.NOT_FOUND, "发送者用户不存在");
             }
-
+            if (senderId.equals(receiverId)) {
+                throw new BaseException(ResponseCodeEnum.BAD_REQUEST, "不能给自己送礼物");
+            }
             // 2. 检查余额是否充足
             if (sysUser.getAccountMoney().compareTo(totalPrice) < 0) {
                 throw new BaseException(ResponseCodeEnum.BAD_REQUEST, "账户余额不足，无法发送礼物");
@@ -159,7 +166,125 @@ public class GiftServiceImpl extends ServiceImpl<GiftMapper, Gift>
             throw new BaseException(ResponseCodeEnum.ERROR, "发送礼物失败: " + e.getMessage());
         }
     }
+    @Override
+    public BigDecimal getTotalIncomeByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+        LambdaQueryWrapper<GiftTransaction> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(GiftTransaction::getAmount);
+        queryWrapper.eq(GiftTransaction::getStatus, GiftTransaction.TransactionStatus.success);
+        queryWrapper.ge(GiftTransaction::getCreatedAt, startDate);
+        queryWrapper.le(GiftTransaction::getCreatedAt, endDate);
 
+        List<GiftTransaction> transactions = giftTransactionMapper.selectList(queryWrapper);
+
+        return transactions.stream()
+                .map(GiftTransaction::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    @Override
+    public List<DailyIncomeVo> getTotalDailyIncomeStats(LocalDateTime startDate, LocalDateTime endDate) {
+        // 查询指定时间范围内的所有成功交易
+        LambdaQueryWrapper<GiftTransaction> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(
+                GiftTransaction::getCreatedAt,
+                GiftTransaction::getAmount
+        );
+        queryWrapper.eq(GiftTransaction::getStatus, GiftTransaction.TransactionStatus.success);
+        queryWrapper.ge(GiftTransaction::getCreatedAt, startDate);
+        queryWrapper.le(GiftTransaction::getCreatedAt, endDate);
+        queryWrapper.orderByAsc(GiftTransaction::getCreatedAt);
+
+        List<GiftTransaction> transactions = giftTransactionMapper.selectList(queryWrapper);
+
+        // 按日期分组求和
+        Map<String, BigDecimal> dailyMap = transactions.stream()
+                .filter(t -> t.getAmount() != null)
+                .collect(Collectors.groupingBy(
+                        t -> t.getCreatedAt().toLocalDate().toString(),
+                        Collectors.mapping(
+                                GiftTransaction::getAmount,
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
+                        )
+                ));
+
+        // 生成日期范围内的所有日期
+        List<DailyIncomeVo> result = generateDailyIncomeList(dailyMap, startDate, endDate);
+
+        log.info("查询系统每日收入: 日期范围={}至{}, 共{}天",
+                startDate, endDate, result.size());
+
+        return result;
+    }
+    /**
+     * 生成日期范围内的每日收入列表
+     */
+    private List<DailyIncomeVo> generateDailyIncomeList(Map<String, BigDecimal> dailyMap,
+                                                        LocalDateTime startDate,
+                                                        LocalDateTime endDate) {
+        List<DailyIncomeVo> result = new ArrayList<>();
+        LocalDate current = startDate.toLocalDate();
+        LocalDate end = endDate.toLocalDate();
+
+        while (!current.isAfter(end)) {
+            DailyIncomeVo vo = new DailyIncomeVo();
+            vo.setDate(current.toString());
+            vo.setIncome(dailyMap.getOrDefault(current.toString(), BigDecimal.ZERO));
+            result.add(vo);
+            current = current.plusDays(1);
+        }
+
+        return result;
+    }
+
+    @Override
+    public BigDecimal getRoomIncomeByDateRange(Long liveRoomId, LocalDateTime startDate, LocalDateTime endDate) {
+        LambdaQueryWrapper<GiftSendRecord> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(GiftSendRecord::getTotalPrice);
+        queryWrapper.eq(GiftSendRecord::getLiveRoomId, liveRoomId);
+        queryWrapper.ge(GiftSendRecord::getCreatedAt, startDate);
+        queryWrapper.le(GiftSendRecord::getCreatedAt, endDate);
+
+        List<GiftSendRecord> records = giftSendRecordMapper.selectList(queryWrapper);
+
+        return records.stream()
+                .map(GiftSendRecord::getTotalPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    @Override
+    public List<DailyIncomeVo> getRoomDailyIncomeStats(Long liveRoomId, LocalDateTime startDate, LocalDateTime endDate) {
+        // 查询指定时间范围内的所有送礼记录
+        LambdaQueryWrapper<GiftSendRecord> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(
+                GiftSendRecord::getCreatedAt,
+                GiftSendRecord::getTotalPrice
+        );
+        queryWrapper.eq(GiftSendRecord::getLiveRoomId, liveRoomId);
+        queryWrapper.ge(GiftSendRecord::getCreatedAt, startDate);
+        queryWrapper.le(GiftSendRecord::getCreatedAt, endDate);
+        queryWrapper.orderByAsc(GiftSendRecord::getCreatedAt);
+
+        List<GiftSendRecord> records = giftSendRecordMapper.selectList(queryWrapper);
+
+        // 按日期分组求和
+        Map<String, BigDecimal> dailyMap = records.stream()
+                .filter(r -> r.getTotalPrice() != null)
+                .collect(Collectors.groupingBy(
+                        r -> r.getCreatedAt().toLocalDate().toString(),
+                        Collectors.mapping(
+                                GiftSendRecord::getTotalPrice,
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
+                        )
+                ));
+
+        // 生成日期范围内的所有日期
+        List<DailyIncomeVo> result = generateDailyIncomeList(dailyMap, startDate, endDate);
+
+        log.info("查询直播间每日收入: 房间ID={}, 日期范围={}至{}, 共{}天",
+                liveRoomId, startDate, endDate, result.size());
+
+        return result;
+    }
 }
 
 
