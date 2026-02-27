@@ -1,6 +1,7 @@
 package top.lyh.entity.pojo;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -98,7 +99,6 @@ public class SysUser {
     /**
      * 身份证号
      */
-    @JsonIgnore
     private String idNumber;
 
     /**
@@ -125,6 +125,11 @@ public class SysUser {
      * 更新时间
      */
     private Date updateTime;
+    @TableField(exist = false) // 非数据库字段
+    private String roleCode;
+
+    @TableField(exist = false) // 非数据库字段
+    private String roleName;
 
     // 可选：新增性别枚举转换方法（方便业务层使用）
     public SexEnum getSexEnum() {

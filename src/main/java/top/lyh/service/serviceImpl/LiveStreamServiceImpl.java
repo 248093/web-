@@ -2,6 +2,7 @@ package top.lyh.service.serviceImpl;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
@@ -30,7 +31,7 @@ import java.util.Map;
 
 @Service
 @Slf4j
-public class LiveStreamServiceImpl implements LiveStreamService {
+public class LiveStreamServiceImpl extends ServiceImpl<LiveStreamMapper, LiveStream> implements LiveStreamService{
 
     @Autowired
     private LiveRoomService liveRoomService;
@@ -68,37 +69,24 @@ public class LiveStreamServiceImpl implements LiveStreamService {
     @Override
     @Transactional
     public LiveRoom startLiveStream(Long roomId) {
-        // 获取当前用户
-        Subject currentUser = SecurityUtils.getSubject();
-        Object principal = currentUser.getPrincipal();
-        SysUser user = (SysUser) principal;
         LiveRoom liveRoom = liveRoomMapper.selectById(roomId);
         if (liveRoom == null) {
             throw new IllegalArgumentException("直播间不存在");
-        }
-        QueryWrapper<LiveRoom> queryWrapper1 = new QueryWrapper<>();
-        queryWrapper1.eq("user_id", user.getId());
-        LiveRoom liveRoom1 = liveRoomMapper.selectOne(queryWrapper1);
-        log.info("当前用户: {}, 查询到的直播间: {}", user, liveRoom1);
-        if (liveRoom1 == null) {
-            log.warn("未找到当前用户创建的直播间，用户ID: {}", user.getId());
-            throw new IllegalArgumentException("未找到当前用户创建的直播间，请先创建直播间");
-        }
-        if (!user.getId().equals(liveRoom.getUserId())) {
-            log.warn("用户ID不匹配，当前用户: {}, 直播间所属用户: {}", user.getId(), liveRoom.getUserId());
-            throw new IllegalArgumentException("用户ID不匹配，当前用户无权操作该直播间");
         }
 
         // 更新直播间状态为直播中
         liveRoom.setStatus(1);
         liveRoom.setStartTime(LocalDateTime.now());
         liveRoomMapper.updateById(liveRoom);
+
+        // 修复：先查询是否存在相同stream_id的记录，避免重复插入
         QueryWrapper<LiveStream> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("stream_id", liveRoom.getStreamKey());
-        LiveStream liveStream1 = liveStreamMapper.selectOne(queryWrapper);
-        LiveStream liveStream = new LiveStream();
-        if (liveStream1 == null){
-            // 创建直播流记录
+        LiveStream existingStream = liveStreamMapper.selectOne(queryWrapper);
+
+        if (existingStream == null) {
+            // 只有不存在时才创建新记录
+            LiveStream liveStream = new LiveStream();
             liveStream.setRoomId(roomId);
             liveStream.setStreamId(liveRoom.getStreamKey());
             liveStream.setProtocol("rtmp");
@@ -106,10 +94,11 @@ public class LiveStreamServiceImpl implements LiveStreamService {
             liveStream.setCreatedAt(LocalDateTime.now());
             liveStream.setUpdatedAt(LocalDateTime.now());
             liveStreamMapper.insert(liveStream);
-        }else {
-            liveStream.setStatus(1);
-            liveStream.setUpdatedAt(LocalDateTime.now());
-            liveStreamMapper.updateById(liveStream);
+        } else {
+            // 如果已存在，只更新状态
+            existingStream.setStatus(1);
+            existingStream.setUpdatedAt(LocalDateTime.now());
+            liveStreamMapper.updateById(existingStream);
         }
 
         // 更新Redis缓存中的活跃直播间
@@ -117,9 +106,6 @@ public class LiveStreamServiceImpl implements LiveStreamService {
 
         return liveRoom;
     }
-    /**
-     * 结束直播
-     */
 
     /**
      * 结束直播
@@ -127,38 +113,64 @@ public class LiveStreamServiceImpl implements LiveStreamService {
     @Override
     @Transactional
     public LiveRoom endLiveStream(Long roomId) {
-        LiveRoom liveRoom = liveRoomService.getById(roomId);
-        if (liveRoom == null || liveRoom.getStatus() != 1) {
-            throw new IllegalArgumentException("直播间不存在或未开播");
+        // 参数校验
+        if (roomId == null) {
+            throw new IllegalArgumentException("直播间ID不能为空");
         }
 
-        // 更新直播间状态为已结束
-        liveRoom.setStatus(2);
-        liveRoom.setEndTime(LocalDateTime.now());
-        liveRoomMapper.updateById(liveRoom);
-
-        // 更新直播流状态
-        QueryWrapper<LiveStream> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("room_id", roomId).eq("status", 1);
-
-        LiveStream liveStream = liveStreamMapper.selectOne(queryWrapper);
-        if (liveStream != null) {
-            liveStream.setStatus(2);
-            liveStream.setUpdatedAt(LocalDateTime.now());
-            liveStreamMapper.updateById(liveStream);
+        LiveRoom liveRoom = liveRoomMapper.selectById(roomId);
+        if (liveRoom == null) {
+            log.warn("结束直播失败：直播间不存在，roomId={}", roomId);
+            throw new IllegalArgumentException("直播间不存在");
         }
 
-        // 从Redis中移除活跃直播间
-        redisTemplate.opsForSet().remove("live:active_rooms", String.valueOf(roomId));
+        // 检查直播间状态
+        if (liveRoom.getStatus() != 1) {
+            log.warn("结束直播失败：直播间状态异常，当前状态={}，roomId={}", liveRoom.getStatus(), roomId);
+            throw new IllegalArgumentException("直播间未处于直播状态");
+        }
 
-        return liveRoom;
+        try {
+            // 更新直播间状态为已结束
+            liveRoom.setStatus(0); // 0表示已结束
+            liveRoom.setEndTime(LocalDateTime.now());
+            liveRoomMapper.updateById(liveRoom);
+            log.info("直播间状态已更新为结束：roomId={}", roomId);
+
+            // 更新直播流状态
+            QueryWrapper<LiveStream> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("room_id", roomId).eq("status", 1);
+
+            LiveStream liveStream = liveStreamMapper.selectOne(queryWrapper);
+            if (liveStream != null) {
+                liveStream.setStatus(0); // 0表示已结束
+                liveStream.setUpdatedAt(LocalDateTime.now());
+                liveStreamMapper.updateById(liveStream);
+                log.info("直播流状态已更新为结束：streamId={}", liveStream.getStreamId());
+            } else {
+                log.warn("未找到对应的直播流记录：roomId={}", roomId);
+            }
+
+            // 从Redis中移除活跃直播间
+            redisTemplate.opsForSet().remove("live:active_rooms", String.valueOf(roomId));
+            log.info("已从活跃直播间列表中移除：roomId={}", roomId);
+
+            log.info("直播结束处理完成：roomId={}", roomId);
+            return liveRoom;
+
+        } catch (Exception e) {
+            log.error("结束直播过程发生异常：roomId={}", roomId, e);
+            throw new RuntimeException("结束直播失败：" + e.getMessage());
+        }
     }
+
     /**
      * 校验推流密钥
      */
     @Override
     public boolean validateStreamKey(String streamKey, String token, String expire) {
         if (!keyCheckEnabled) {
+            log.info("推流密钥验证已关闭，允许所有推流");
             return true;
         }
 
@@ -184,14 +196,21 @@ public class LiveStreamServiceImpl implements LiveStreamService {
         log.info("处理流发布回调: app={}, stream={}", app, stream);
         try {
             // 查找对应的直播间
-            var liveRoom = liveRoomService.findByStreamKey(stream);
+            LiveRoom liveRoom = liveRoomService.findByStreamKey(stream);
+
             if (liveRoom != null && liveRoom.getStatus() != 1) {
                 // 开始直播
                 LiveRoom started = startLiveStream(liveRoom.getId());
-                if (!ObjectUtils.isEmpty(started)) {
-                    // 新增：自动开始录制
-                    LiveRecording recording = liveRecordingService.startRecording(liveRoom.getId());
-                    log.info("直播流发布成功: app={}, stream={}, roomId={}", app, stream, liveRoom.getId());
+                if (!ObjectUtils.isEmpty(started)) {  // 修复：正确判断返回值
+                    try {
+                        // 新增：自动开始录制（添加异常处理）
+                        LiveRecording recording = liveRecordingService.startRecording(liveRoom.getId());
+                        log.info("直播流发布成功并开始录制: app={}, stream={}, roomId={}, recordingId={}",
+                                app, stream, liveRoom.getId(), recording.getId());
+                    } catch (Exception e) {
+                        log.error("自动开始录制失败，但直播正常开始: roomId={}", liveRoom.getId(), e);
+                        // 录制失败不应该影响直播流程
+                    }
                 }
             }
         } catch (Exception e) {
@@ -206,21 +225,27 @@ public class LiveStreamServiceImpl implements LiveStreamService {
     public void handleStreamClose(String app, String stream) {
         try {
             // 查找对应的直播间
-            var liveRoom = liveRoomService.findByStreamKey(stream);
-            if (liveRoom != null && liveRoom.getStatus() == 1) {
+            LiveRoom liveRoom = liveRoomService.findByStreamKey(stream);
+            if (!ObjectUtils.isEmpty(liveRoom) && liveRoom.getStatus() == 1) {
+                log.info("处理流关闭回调: app={}, stream={}", app, stream);
                 // 结束直播
                 LiveRoom ended = endLiveStream(liveRoom.getId());
-                if (ObjectUtils.isEmpty(ended)) {
+                if (!ObjectUtils.isEmpty(ended)) {  // 修复：正确判断返回值
                     // 停止录制
                     QueryWrapper<LiveRecording> recordingQuery = new QueryWrapper<>();
                     recordingQuery.eq("room_id", liveRoom.getId())
-                            .eq("status", 0); // 假设 0 表示"录制中"
+                            .eq("status", 0); // 0表示"录制中"
                     LiveRecording recording = liveRecordingMapper.selectOne(recordingQuery);
 
                     if (recording != null) {
-                        liveRecordingService.stopRecording(recording.getId());
-                        log.info("推流结束，自动停止录制: roomId={}, recordingId={}",
-                                liveRoom.getId(), recording.getId());
+                        try {
+                            liveRecordingService.stopRecording(recording.getId());
+                            log.info("推流结束，自动停止录制: roomId={}, recordingId={}",
+                                    liveRoom.getId(), recording.getId());
+                        } catch (Exception e) {
+                            log.error("停止录制失败: roomId={}, recordingId={}",
+                                    liveRoom.getId(), recording.getId(), e);
+                        }
                     }
 
                     log.info("直播流关闭: app={}, stream={}, roomId={}", app, stream, liveRoom.getId());
@@ -230,7 +255,6 @@ public class LiveStreamServiceImpl implements LiveStreamService {
             log.error("处理流关闭回调异常", e);
         }
     }
-
     /**
      * 获取SRS服务器信息
      */

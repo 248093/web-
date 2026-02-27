@@ -1,5 +1,6 @@
 server:
   port: 8080
+  address: 0.0.0.0
 
 spring:
   main:
@@ -37,10 +38,10 @@ mybatis-plus:
 # 流媒体服务器配置
 live:
   srs:
-    server-url: rtmp://192.168.209.128:1935/live  # SRS的RTMP推流/拉流地址，1935是SRS默认RTMP端口，/live是应用名
-    api-url: http://192.168.209.128:1985/api      # SRS的HTTP API地址，1985是SRS API默认端口，用于业务系统控制SRS
-    http-flv-url: http://192.168.209.128:8080/live # SRS的HTTP-FLV拉流地址前缀，8080是SRS内置HTTP服务端口，依赖http_remux模块
-    hls-url: http://192.168.209.128:8080/hls/live  # SRS的HLS拉流地址前缀，依赖hls模块，对应SRS配置的hls_path路径
+    server-url: rtmp://192.168.86.8:1935/live  # SRS的RTMP推流/拉流地址，1935是SRS默认RTMP端口，/live是应用名
+    api-url: http://192.168.86.8:1985/api      # SRS的HTTP API地址，1985是SRS API默认端口，用于业务系统控制SRS
+    http-flv-url: http://192.168.86.8:8080/live # SRS的HTTP-FLV拉流地址前缀，8080是SRS内置HTTP服务端口，依赖http_remux模块
+    hls-url: http://192.168.86.8:8080/hls/live  # SRS的HLS拉流地址前缀，依赖hls模块，对应SRS配置的hls_path路径
   record:
     save-path: /root/dvr/live  # 业务系统存储录制文件的本地路径，需和SRS的dvr模块配合使用
   push:
@@ -49,7 +50,7 @@ live:
 
 # MinIO配置
 minio:
-  endpoint: http://192.168.209.128:9000
+  endpoint: http://192.168.86.8:9000
   access-key: root
   secret-key: 12345678
   bucket: live-recordings
@@ -76,3 +77,10 @@ alipay:
   appPrivateKey: ${pay.alipay.appPrivateKey}
   alipayPublicKey: ${pay.alipay.alipayPublicKey}
   notifyUrl: ${pay.alipay.notifyUrl}
+
+# 清理任务配置
+cleanup:
+  enabled: true
+  days: 30  # 默认清理30天前的文件
+  cron: "0 0 2 * * ?"  # 每天凌晨2点执行
+  batch-size: 100  # 每批处理数量

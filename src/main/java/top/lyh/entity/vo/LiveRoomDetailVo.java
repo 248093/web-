@@ -53,7 +53,7 @@ public class LiveRoomDetailVo {
     private Long viewCount;
 
     /**
-     * 点赞数
+     * 赚取金额
      */
     private BigDecimal amountCount;
 
@@ -69,4 +69,8 @@ public class LiveRoomDetailVo {
      * 主播头像
      */
     private String anchorAvatar;
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createdAt;
 }

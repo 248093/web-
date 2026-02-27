@@ -11,15 +11,18 @@ import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import top.lyh.anno.LogAnnotation;
 import top.lyh.common.PageResult;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.common.ResultDTO;
+import top.lyh.entity.dto.LiveRecordingQueryDto;
 import top.lyh.entity.dto.LiveRoomQueryDto;
 import top.lyh.entity.pojo.LiveRecording;
 import top.lyh.entity.pojo.LiveRoom;
+import top.lyh.entity.pojo.LiveStream;
 import top.lyh.entity.pojo.SysUser;
 import top.lyh.entity.vo.LiveRoomDetailVo;
 import top.lyh.service.*;
@@ -54,8 +57,6 @@ public class LiveController {
     @Autowired
     private RedisUtil redisTemplate;
     @Autowired
-    private RoomBlacklistService roomBlacklistService;
-    @Autowired
     private AliOSSUtils aliOSSUtils;
 
     /**
@@ -63,6 +64,7 @@ public class LiveController {
      */
     @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room")
+    @LogAnnotation(value = "创建直播间", recordParams = false, recordResult = true)
     public ResultDTO createLiveRoom(@RequestBody LiveRoom liveRoom) {
         try {
             if (liveRoom.getId()== null) {
@@ -82,6 +84,7 @@ public class LiveController {
      * 获取直播间详情
      */
     @GetMapping("/room/{roomId}")
+    @LogAnnotation(value = "获取直播间详情", recordParams = false, recordResult = true)
     public ResultDTO getLiveRoom(@PathVariable Long roomId) {
         try {
             LiveRoom liveRoom = liveRoomService.getById(roomId);
@@ -100,6 +103,8 @@ public class LiveController {
     }
     // 获得推流地址
     @GetMapping("/room/get/streamUrl")
+    @LogAnnotation(value = "获取推流地址", recordParams = false, recordResult = true)
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     public ResultDTO getPushUrl() {
         Subject subject = SecurityUtils.getSubject();
         log.info("getPushUrl - Subject是否存在: {}", subject != null);
@@ -123,8 +128,9 @@ public class LiveController {
     /**
      * 开始直播
      */
-    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room/{roomId}/start")
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
+    @LogAnnotation(value = "开始直播", recordParams = false, recordResult = true)
     public ResultDTO startLiveStream(@PathVariable Long roomId) {
         log.info("直播间Id: {}", roomId);
         try {
@@ -143,6 +149,7 @@ public class LiveController {
      */
     @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
     @PostMapping("/room/{roomId}/end")
+    @LogAnnotation(value = "结束直播", recordParams = false, recordResult = true)
     public ResultDTO endLiveStream(@PathVariable Long roomId) {
         try {
             LiveRoom liveRoom = liveStreamService.endLiveStream(roomId);
@@ -262,13 +269,15 @@ public class LiveController {
     /**
      * 获取直播回放列表
      */
-    @GetMapping("/room/{roomId}/recordings")
+    @RequiresRoles("ADMIN")
+    @PostMapping("/room/admin/recordings")
+    @LogAnnotation(value = "获取直播回放列表", recordParams = false, recordResult = true)
     public ResultDTO getRecordings(
-            @PathVariable Long roomId,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestBody LiveRecordingQueryDto liveRecordingQueryDto) {
         try {
-            List<LiveRecording> recordings = recordingService.getRecordings(roomId, page, size);
+            PageResult<LiveRecording> recordings = recordingService.getRecordings(liveRecordingQueryDto.getLiveRecording(),
+                    liveRecordingQueryDto.getPage(),
+                    liveRecordingQueryDto.getSize());
             return ResultDTO.success("获取直播回放列表成功", recordings);
         } catch (Exception e) {
             log.error("获取直播回放列表异常", e);
@@ -284,6 +293,34 @@ public class LiveController {
         } catch (Exception e) {
             log.error("上传失败", e);
             return ResultDTO.error("上传失败");
+        }
+    }
+    /**
+     * 封禁直播间
+     */
+    @RequiresRoles("ADMIN")
+    @PutMapping("/ban")
+    @Transactional
+    @LogAnnotation(value = "封禁直播间", recordParams = false, recordResult = true)
+    public ResultDTO updateLiveRoomStatus(@RequestParam Long liveRoomId, @RequestParam Integer status) {
+        try {
+            LiveRoom liveRoom = new LiveRoom();
+            liveRoom.setId(liveRoomId);
+            liveRoom.setStatus(status);
+            LambdaQueryWrapper<LiveRoom> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(LiveRoom::getId, liveRoomId);
+            LambdaQueryWrapper<LiveStream> queryWrapper1 = new LambdaQueryWrapper<>();
+            queryWrapper1.eq(LiveStream::getRoomId, liveRoomId);
+            LiveStream one = liveStreamService.getOne(queryWrapper1);
+            if (one != null){
+                one.setStatus(status);
+                liveStreamService.update(one, queryWrapper1);
+            }
+            boolean result = liveRoomService.update(liveRoom, queryWrapper);
+            return result ? ResultDTO.success("操作成功") : ResultDTO.error("操作失败");
+        } catch (Exception e) {
+            log.error("封禁用户异常", e);
+            return ResultDTO.error("操作失败：" + e.getMessage());
         }
     }
 }

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import top.lyh.common.PageResult;
+import top.lyh.entity.dto.GiftTransactionQueryDto;
 import top.lyh.entity.pojo.GiftTransaction;
 import top.lyh.mapper.GiftTransactionMapper;
 import top.lyh.service.GiftTransactionService;
@@ -26,11 +27,10 @@ public class GiftTransactionServiceImpl extends ServiceImpl<GiftTransactionMappe
     }
 
     @Override
-    public PageResult<GiftTransaction> getByPage(GiftTransaction giftTransaction) {
-        log.info("分页动态查询：{}", giftTransaction.getCurrent());
+    public PageResult<GiftTransaction> getByPage(GiftTransactionQueryDto giftTransaction) {
         // 2. 创建 MyBatis-Plus 分页对象
         Page<GiftTransaction> page = new Page<>(
-                giftTransaction.getCurrent(),
+                giftTransaction.getPage(),
                 giftTransaction.getSize()
         );
 
@@ -51,14 +51,12 @@ public class GiftTransactionServiceImpl extends ServiceImpl<GiftTransactionMappe
         if (giftTransaction.getPaymentType() != null) {
             wrapper.eq(GiftTransaction::getPaymentType, giftTransaction.getPaymentType());
         }
+        if (giftTransaction.getTransactionNo() != null){
+            wrapper.eq(GiftTransaction::getTransactionNo, giftTransaction.getTransactionNo());
+        }
         // 4. 排序
         // 注意：这里应该始终按创建时间倒序排序
         wrapper.orderByDesc(GiftTransaction::getCreatedAt);
-
-        // 有金额排序需求
-         if (giftTransaction.getAmount() != null) {
-             wrapper.orderByDesc(GiftTransaction::getAmount);
-         }
 
         // 5. 执行分页查询
         Page<GiftTransaction> pageData = this.page(page, wrapper);

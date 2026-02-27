@@ -1,5 +1,6 @@
 package top.lyh.service;
 
+import top.lyh.common.PageResult;
 import top.lyh.entity.pojo.LiveRecording;
 import java.util.List;
 
@@ -24,10 +25,9 @@ public interface LiveRecordingService {
 
     /**
      * 获取直播间的直播回放列表（分页查询，仅返回「可用」状态的回放）
-     * @param roomId 直播间ID
      * @param page 页码（从1开始）
      * @param size 每页条数
      * @return 分页后的直播回放列表
      */
-    List<LiveRecording> getRecordings(Long roomId, int page, int size);
+    PageResult<LiveRecording> getRecordings(LiveRecording liveRecording, Integer page, Integer size);
 }

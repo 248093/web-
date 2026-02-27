@@ -1,6 +1,8 @@
 package top.lyh.service;
 
 import org.springframework.web.multipart.MultipartFile;
+import top.lyh.common.PageResult;
+import top.lyh.entity.dto.GiftQueryDto;
 import top.lyh.entity.pojo.Gift;
 import com.baomidou.mybatisplus.extension.service.IService;
 import top.lyh.entity.pojo.GiftSendRecord;
@@ -17,11 +19,13 @@ import java.util.List;
 */
 public interface GiftService extends IService<Gift> {
     // 增加修改礼物
-    boolean saveOrEditGift(Gift gift, MultipartFile file);
+    boolean saveOrEditGift(Gift gift);
     // 删除礼物
     boolean deleteGift(Long id);
     // 查询礼物
     List<Gift> queryGift(Long id);
+    //根据分页查询礼物
+    PageResult<Gift> queryGiftByPage(GiftQueryDto gift);
 
     boolean sendGift(GiftSendRecord giftSendRecord) throws Exception;
     /**

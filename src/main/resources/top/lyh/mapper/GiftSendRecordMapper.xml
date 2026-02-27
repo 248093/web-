@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="top.lyh.mapper.GiftSendRecordMapper">
+
+    <!-- 动态条件分页查询礼物赠送记录 -->
+    <select id="selectByCondition" resultType="top.lyh.entity.vo.GiftSendRecordVO">
+        SELECT
+        gsr.id,
+        gsr.sender_id as senderId,
+        sender.user_name as senderName,
+        gsr.receiver_id as receiverId,
+        receiver.user_name as receiverName,
+        gsr.live_room_id as liveRoomId,
+        lr.title as liveRoomTitle,
+        gsr.gift_id as giftId,
+        g.name as giftName,
+        g.image_url as giftImageUrl,
+        gsr.quantity,
+        g.price as unitPrice,
+        gsr.total_price as totalPrice,
+        gsr.created_at as createdAt,
+        DATE_FORMAT(gsr.created_at, '%Y-%m-%d %H:%i:%s') as createdAtFormatted
+        FROM gift_send_record gsr
+        LEFT JOIN sys_user sender ON gsr.sender_id = sender.id
+        LEFT JOIN sys_user receiver ON gsr.receiver_id = receiver.id
+        LEFT JOIN live_room lr ON gsr.live_room_id = lr.id
+        LEFT JOIN gift g ON gsr.gift_id = g.id
+        <where>
+            <if test="query.senderId != null">
+                AND gsr.sender_id = #{query.senderId}
+            </if>
+            <if test="query.senderName != null and query.senderName != ''">
+                AND sender.user_name LIKE CONCAT('%', #{query.senderName}, '%')
+            </if>
+            <if test="query.receiverId != null">
+                AND gsr.receiver_id = #{query.receiverId}
+            </if>
+            <if test="query.receiverName != null and query.receiverName != ''">
+                AND receiver.user_name LIKE CONCAT('%', #{query.receiverName}, '%')
+            </if>
+            <if test="query.liveRoomId != null">
+                AND gsr.live_room_id = #{query.liveRoomId}
+            </if>
+            <if test="query.giftId != null">
+                AND gsr.gift_id = #{query.giftId}
+            </if>
+            <if test="query.giftName != null and query.giftName != ''">
+                AND g.name LIKE CONCAT('%', #{query.giftName}, '%')
+            </if>
+            <if test="query.createdAtStart != null">
+                AND gsr.created_at >= #{query.createdAtStart}
+            </if>
+            <if test="query.createdAtEnd != null">
+                AND gsr.created_at <![CDATA[ <= ]]> #{query.createdAtEnd}
+            </if>
+        </where>
+                ORDER BY gsr.created_at DESC
+    </select>
+
+
+</mapper>

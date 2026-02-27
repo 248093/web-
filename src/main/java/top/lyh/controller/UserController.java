@@ -5,9 +5,11 @@ import io.jsonwebtoken.Claims;
 import io.micrometer.common.util.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresAuthentication;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.apache.shiro.crypto.hash.SimpleHash;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.ByteSource;
@@ -17,9 +19,12 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import top.lyh.anno.LogAnnotation;
+import top.lyh.common.PageResult;
 import top.lyh.common.ResultDTO;
+import top.lyh.entity.dto.SysUserQueryDto;
 import top.lyh.entity.dto.UserLoginDTO;
 import top.lyh.entity.dto.UserRegisterDTO;
+import top.lyh.entity.pojo.DailyVisitStat;
 import top.lyh.entity.pojo.SysUser;
 import top.lyh.service.DailyVisitStatService;
 import top.lyh.service.SendMessageService;
@@ -102,6 +107,7 @@ public class UserController {
     }
 
     @GetMapping("/logout")
+    @RequiresAuthentication
     @LogAnnotation(value = "用户登出", recordParams = false, recordResult = true)
     public ResultDTO logout(HttpServletRequest request) {
         // 获取token
@@ -153,12 +159,14 @@ public class UserController {
         }
     }
     @GetMapping("/getUserInfo")
+    @RequiresAuthentication
     @LogAnnotation(value = "获取用户信息", recordParams = false, recordResult = true)
     public ResultDTO getUserInfo(@RequestParam Long userId) {
         return ResultDTO.success(sysUserService.getById(userId));
     }
     // 或者使用 JSON + 文件的方式
     @PostMapping("/updateUser")
+    @RequiresAuthentication
     @LogAnnotation(value = "更新用户信息", recordParams = false, recordResult = true)
     public ResultDTO updateUser(
             @RequestBody SysUser user) {
@@ -175,6 +183,7 @@ public class UserController {
         }
     }
     @PostMapping("/uploadAvatar")
+    @RequiresAuthentication
     @LogAnnotation(value = "上传用户头像", recordParams = false, recordResult = true)
     public ResultDTO uploadAvatar(@RequestParam MultipartFile file) {
         try {
@@ -186,6 +195,7 @@ public class UserController {
         }
     }
     @PostMapping("/updatePhone")
+    @RequiresAuthentication
     @LogAnnotation(value = "更新手机号", recordParams = false, recordResult = true)
     public ResultDTO updatePhone(@RequestParam Long userId,
                                  @RequestParam String oldPhone,
@@ -234,36 +244,39 @@ public class UserController {
         long count = sysUserService.count();
         return ResultDTO.success("获取用户数量成功", count);
     }
-    // 添加测试接口来检查认证状态
-    @GetMapping("/test/auth")
-    public ResultDTO testAuth() {
+    /**
+     * 分页查询用户列表（支持动态条件查询）
+     * @param queryDto 查询条件
+     * @return 分页结果
+     */
+    @PostMapping("/pageQuery")
+    @LogAnnotation(value = "分页查询用户列表", recordParams = true, recordResult = true)
+    @RequiresAuthentication
+    public ResultDTO pageQueryUsers(@RequestBody @Valid SysUserQueryDto queryDto) {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            log.info("Subject是否存在: {}", subject != null);
-            log.info("Subject是否已认证: {}", subject.isAuthenticated());
-
-            if (subject.isAuthenticated()) {
-                Object principal = subject.getPrincipal();
-                log.info("Principal对象: {}", principal);
-                log.info("Principal类型: {}", principal != null ? principal.getClass() : "null");
-
-                if (principal instanceof SysUser) {
-                    SysUser user = (SysUser) principal;
-                    return ResultDTO.success("认证成功", Map.of(
-                            "userId", user.getId(),
-                            "username", user.getUserName(),
-                            "isAuthenticated", true
-                    ));
-                } else {
-                    return ResultDTO.error("Principal不是SysUser类型");
-                }
-            } else {
-                return ResultDTO.error("用户未认证");
-            }
+            PageResult<SysUser> pageResult = sysUserService.pageQueryUsers(queryDto);
+            return ResultDTO.success("查询成功", pageResult);
         } catch (Exception e) {
-            log.error("测试认证状态异常", e);
-            return ResultDTO.error("测试失败: " + e.getMessage());
+            log.error("分页查询用户列表异常", e);
+            return ResultDTO.error("查询失败：" + e.getMessage());
         }
     }
-
+    // 封禁用户
+    @PutMapping("/updateStatus")
+    @RequiresRoles("ADMIN")
+    @LogAnnotation(value = "封禁用户", recordParams = false, recordResult = true)
+    public ResultDTO updateStatus(@RequestParam Long userId, @RequestParam Integer status) {
+        try {
+            SysUser sysUser = new SysUser();
+            sysUser.setId(userId);
+            sysUser.setEnabled(status);
+            LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(SysUser::getId, userId);
+            boolean result = sysUserService.update(sysUser, queryWrapper);
+            return result ? ResultDTO.success("操作成功") : ResultDTO.error("操作失败");
+        } catch (Exception e) {
+            log.error("封禁用户异常", e);
+            return ResultDTO.error("操作失败：" + e.getMessage());
+        }
+    }
 }

@@ -1,10 +1,12 @@
 package top.lyh.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import top.lyh.entity.pojo.LiveRoom;
+import top.lyh.entity.pojo.LiveStream;
 
 import java.util.Map;
 
-public interface LiveStreamService {
+public interface LiveStreamService extends IService<LiveStream> {
 
     /**
      * 开始直播

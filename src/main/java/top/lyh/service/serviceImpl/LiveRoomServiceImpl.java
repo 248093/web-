@@ -204,7 +204,6 @@ public class LiveRoomServiceImpl extends ServiceImpl<LiveRoomMapper, LiveRoom> i
         try {
             LiveRoom liveRoom = new LiveRoom();
             liveRoom.setId(roomId);
-            liveRoom.setStatus(3); // 假设3表示已删除
             liveRoom.setUpdatedAt(LocalDateTime.now());
             
             int result = liveRoomMapper.updateById(liveRoom);

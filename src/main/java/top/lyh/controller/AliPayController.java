@@ -15,9 +15,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authz.annotation.RequiresAuthentication;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.apache.shiro.subject.Subject;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import top.lyh.anno.LogAnnotation;
 import top.lyh.common.ResultDTO;
 import top.lyh.config.AliPayConfig;
 import top.lyh.entity.pojo.GiftTransaction;
@@ -49,6 +52,8 @@ public class AliPayController {
     private SysUserService sysUserService;
 
     @PostMapping("/pay")
+    @LogAnnotation(value = "支付", recordParams = false, recordResult = true)
+    @RequiresAuthentication
     public void pay(@RequestBody GiftTransaction aliPay, HttpServletResponse httpResponse) throws IOException {
         // 设置响应编码
         httpResponse.setCharacterEncoding(StandardCharsets.UTF_8.name());
@@ -195,6 +200,7 @@ public class AliPayController {
      */
     @GetMapping("/order/status")
     @Transactional
+    @LogAnnotation(value = "查询订单状态", recordParams = false, recordResult = true)
     public ResultDTO getOrderStatus(@RequestParam String orderNo) {
         log.info("查询订单状态，订单号: {}", orderNo);
 

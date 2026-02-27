@@ -29,7 +29,7 @@ public class LiveRoom {
     
     private String flvUrl;     // HTTP-FLV播放地址
     
-    private Integer status;    // 0:未开播 1:直播中 2:直播结束
+    private Integer status;    // 0:未开播 1:直播中 2:封禁
     
     private Long viewCount;    // 观看人数
     

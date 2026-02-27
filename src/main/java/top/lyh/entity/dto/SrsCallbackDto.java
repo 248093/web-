@@ -1,5 +1,6 @@
 package top.lyh.entity.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import java.io.Serializable;
 
@@ -8,6 +9,7 @@ import java.io.Serializable;
  * 对应 SRS 回调时发送的 JSON 参数格式，字段与 SRS 官方回调参数一致
  */
 @Data // Lombok 注解，自动生成 getter/setter/toString/equals 等方法
+@JsonIgnoreProperties(ignoreUnknown = true) // 忽略未知字段，防止JSON解析异常
 public class SrsCallbackDto implements Serializable {
 
     private static final long serialVersionUID = 1L;

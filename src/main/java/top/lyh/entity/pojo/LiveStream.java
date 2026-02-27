@@ -24,7 +24,7 @@ public class LiveStream {
     
     private String resolution; // 分辨率
     
-    private Integer status;   // 0:未启动 1:活跃 2:已结束
+    private Integer status;   // 0:未启动 1:活跃 2:封禁
     
     private LocalDateTime createdAt;
     

@@ -1,6 +1,8 @@
 package top.lyh.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import top.lyh.common.PageResult;
+import top.lyh.entity.dto.CategoryQueryDto;
 import top.lyh.entity.pojo.Category;
 import top.lyh.entity.vo.CategoryVO;
 import top.lyh.entity.vo.CategoryCountVO;
@@ -15,6 +17,10 @@ public interface CategoryService extends IService<Category> {
      */
     List<CategoryVO> getCategoryTree();
 
+    /**
+     * 动态分页查询分类列表
+     */
+    PageResult<Category> getCategoryByPage(CategoryQueryDto queryDto);
     /**
      * 获取所有一级分类
      */

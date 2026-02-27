@@ -90,6 +90,33 @@ public class DailyVisitStatServiceImpl extends ServiceImpl<DailyVisitStatMapper,
         queryWrapper.orderByAsc(DailyVisitStat::getStatDate);
         return this.list(queryWrapper);
     }
+    /**
+     * 获取实时统计信息（从Redis中获取）
+     */
+    public DailyVisitStat getRealTimeStats() {
+        try {
+            String today = LocalDate.now().format(DATE_FORMATTER);
+            String visitCountKey = VISIT_COUNT_KEY_PREFIX + today;
+            String visitUsersKey = VISIT_USERS_KEY_PREFIX + today;
+            String newUsersKey = NEW_USERS_KEY_PREFIX + today;
+
+            Object visitCountObj = redisUtil.get(visitCountKey);
+            Set<Object> visitUsersSet = redisUtil.sMembers(visitUsersKey);
+            Set<Object> newUsersSet = redisUtil.sMembers(newUsersKey);
+
+            DailyVisitStat stat = new DailyVisitStat();
+            stat.setStatDate(today);
+            stat.setVisitCount(visitCountObj != null ? Integer.parseInt(visitCountObj.toString()) : 0);
+            stat.setUserCount(visitUsersSet != null ? visitUsersSet.size() : 0);
+            stat.setNewUserCount(newUsersSet != null ? newUsersSet.size() : 0);
+            stat.setCreateTime(new Date());
+
+            return stat;
+        } catch (Exception e) {
+            log.error("获取实时统计信息失败: {}", e.getMessage(), e);
+            return null;
+        }
+    }
 
 
 }

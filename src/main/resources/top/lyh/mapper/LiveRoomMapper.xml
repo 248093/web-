@@ -15,6 +15,7 @@
         <result property="amountCount" column="amount_count"/>
         <result property="startTime" column="start_time"/>
         <result property="categoryId" column="category_id"/>
+        <result property="createdAt" column="created_at"></result>
     </resultMap>
 
     <!-- 动态条件查询直播间列表（唯一的核心查询方法） -->
@@ -31,7 +32,8 @@
         lr.view_count,
         lr.amount_count,
         lr.start_time,
-        lr.category_id
+        lr.category_id,
+        lr.created_at
         FROM live_room lr
         LEFT JOIN sys_user su ON lr.user_id = su.id
         <where>

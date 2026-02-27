@@ -1,13 +1,17 @@
 package top.lyh.service.serviceImpl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import top.lyh.common.PageResult;
 import top.lyh.common.ResponseCodeEnum;
+import top.lyh.entity.dto.GiftQueryDto;
 import top.lyh.entity.pojo.*;
 import top.lyh.entity.vo.DailyIncomeVo;
 import top.lyh.exceptionHandler.BaseException;
@@ -45,13 +49,7 @@ public class GiftServiceImpl extends ServiceImpl<GiftMapper, Gift>
     @Autowired
     private GiftTransactionMapper giftTransactionMapper;
     @Override
-    public boolean saveOrEditGift(Gift gift, MultipartFile file) {
-        try {
-            String upload = aliOSSUtils.upload(file,"giftIcon");
-            gift.setImageUrl(upload);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public boolean saveOrEditGift(Gift gift) {
         if (gift.getId() == null) {
             List<Gift> allGifts = queryGift(null);
             if (allGifts.size() >= 50) {
@@ -76,6 +74,23 @@ public class GiftServiceImpl extends ServiceImpl<GiftMapper, Gift>
             return allGifts.isEmpty() ? null : allGifts; // 返回第一条数据或 null
         }
         return List.of(getById(id)); // 正常根据 ID 查询
+    }
+
+    @Override
+    public PageResult<Gift> queryGiftByPage(GiftQueryDto gift) {
+        LambdaQueryWrapper<Gift> queryWrapper = new LambdaQueryWrapper<>();
+        if (gift.getName()!= null){
+            queryWrapper.like(Gift::getName, gift.getName());
+        }
+        if ( gift.getPage()==null || gift.getPage()<1){
+            gift.setPage(1);
+        }
+        if (gift.getPageSize()==null|| gift.getPageSize()<1 ){
+            gift.setPageSize(10);
+        }
+        Page<Gift> page = new Page<>(gift.getPage(), gift.getPageSize());
+        IPage<Gift> pageResult = page(page, queryWrapper);
+        return new PageResult<>(pageResult.getRecords(), pageResult.getTotal(), (int) page.getCurrent(), (int) page.getSize());
     }
 
     @Override

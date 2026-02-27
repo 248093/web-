@@ -56,11 +56,15 @@ public class UserRegisterDTO implements Serializable {
     /**
      * 邮箱
      */
-    @NotEmpty
     private String email;
     /**
      * 性别
      */
     @NotEmpty
     private String sex;
+
+    /**
+     * 头像
+     */
+    private String avatar;
 }

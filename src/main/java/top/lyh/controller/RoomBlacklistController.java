@@ -1,22 +1,30 @@
 package top.lyh.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+import top.lyh.anno.LogAnnotation;
 import top.lyh.common.PageResult;
 import top.lyh.common.ResponseCodeEnum;
 import top.lyh.common.ResultDTO;
 import top.lyh.entity.dto.RoomBlacklistQueryDto;
 import top.lyh.entity.pojo.LiveRoom;
 import top.lyh.entity.pojo.RoomBlacklist;
+import top.lyh.entity.pojo.SysUser;
+import top.lyh.entity.pojo.SysUserRole;
 import top.lyh.entity.vo.RoomBlacklistDetailVo;
+import top.lyh.mapper.SysUserRoleMapper;
 import top.lyh.service.LiveRoomService;
 import top.lyh.service.RoomBlacklistService;
+import top.lyh.service.SysUserService;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 直播间黑名单控制器
@@ -32,9 +40,12 @@ public class RoomBlacklistController {
     private SimpMessagingTemplate messagingTemplate;
     @Autowired
     private LiveRoomService liveRoomService;
-
+    @Autowired
+    private SysUserService sysUserService;
 
     @PostMapping("/page")
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
+    @LogAnnotation(value = "查询黑名单详情")
     public ResultDTO getBlacklistPage(@RequestBody RoomBlacklistQueryDto queryDto) {
         try {
             PageResult<RoomBlacklistDetailVo> result = roomBlacklistService.getBlacklistDetailPage(queryDto);
@@ -49,6 +60,8 @@ public class RoomBlacklistController {
      * 拉黑并踢出用户（一体化操作）
      */
     @PostMapping("/add-and-kick")
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
+    @LogAnnotation(value = "拉黑并踢出用户")
     public ResultDTO blacklistAndKick(@RequestParam Long liveRoomId,
                                       @RequestParam Long userId,
                                       @RequestParam Long operatorId,
@@ -57,6 +70,11 @@ public class RoomBlacklistController {
             LiveRoom liveRoom = liveRoomService.getById(liveRoomId);
             if (liveRoom.getUserId() != operatorId){
                 return ResultDTO.error("您没有权限进行此操作");
+            }
+            SysUser byId = sysUserService.getById(userId);
+            Set<String> roles = sysUserService.findRoles(byId.getUserName());
+            if(roles.contains("ADMIN")){
+                return ResultDTO.error("您没有权限踢出管理员!");
             }
             // 执行拉黑操作
             boolean blacklisted = roomBlacklistService.blacklistUser(liveRoomId, userId, operatorId, reason);
@@ -107,6 +125,8 @@ public class RoomBlacklistController {
      * 取消拉黑
      */
     @DeleteMapping("/remove")
+    @RequiresRoles(value = {"ADMIN", "HOST"}, logical = Logical.OR)
+    @LogAnnotation(value = "取消拉黑")
     public ResultDTO unblacklistUser(@RequestParam Long liveRoomId,
                                     @RequestParam Long userId) {
         try {

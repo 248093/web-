@@ -24,5 +24,6 @@ public interface DailyVisitStatService extends IService<DailyVisitStat> {
      * @return 统计数据列表
      */
     List<DailyVisitStat> getVisitStatsByDateRange(LocalDate startDate, LocalDate endDate);
+    DailyVisitStat getRealTimeStats();
 
 }

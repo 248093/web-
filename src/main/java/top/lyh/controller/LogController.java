@@ -3,6 +3,7 @@ package top.lyh.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.RequiresAuthentication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -73,5 +74,18 @@ public class LogController {
         List<DailyVisitStat> stats = dailyVisitStatService.getVisitStatsByDateRange(startDate, endDate);
         return ResultDTO.success(stats);
     }
-
+    /**
+     * 获取实时访问统计数据
+     */
+    @GetMapping("/visit/stats/realtime")
+    @RequiresAuthentication
+    public ResultDTO getRealTimeVisitStats() {
+        try {
+            DailyVisitStat stats = dailyVisitStatService.getRealTimeStats();
+            return ResultDTO.success("获取成功", stats);
+        } catch (Exception e) {
+            log.error("获取实时访问统计失败", e);
+            return ResultDTO.error("获取失败");
+        }
+    }
 }
